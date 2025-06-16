@@ -179,6 +179,7 @@ class NeuralRewardMachine:
         print("training on {} sequences using {} automaton states".format(tot_size, self.numb_of_states))
 
         params = self.classifier.parameters()
+        params = list(params) + list(self.deepAutoma.parameters())
         if self.dataset == "minecraft_location":
             optimizer = torch.optim.Adam(params, lr=0.005)#, weight_decay=1e-3)
         else:

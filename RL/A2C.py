@@ -98,6 +98,7 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction):
     if method == "rnn":
         model = ActorCritic(rnn_hidden_size, num_outputs, hidden_size).to(device)
     else:#"nrm" o "rm"
+        print(f"PASSING num_inputs: {num_inputs}, num_outputs: {num_outputs}, hidden_size: {hidden_size}")
         model = ActorCritic(num_inputs + env.automaton.num_of_states, num_outputs, hidden_size).to(device)
     params += list(model.parameters())
     model.double()
@@ -113,13 +114,15 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction):
         f.close()
 
         num_of_states, num_of_symbols, num_automaton_outputs, transition_function, automaton_rewards = env.get_automaton_specs()
+        num_of_states = 20 
+        num_of_symbols = 5
         if env.state_type == "symbolic":
             dataset = "minecraft_location"
         elif env.state_type == "image":
             dataset = "minecraft_image"
         grounder = NeuralRewardMachine(num_of_states, num_of_symbols, num_automaton_outputs, num_exp=experiment,
                                        log_dir=path, dataset=dataset)
-        grounder.deepAutoma.initFromDfa(transition_function, automaton_rewards)
+        #grounder.deepAutoma.initFromDfa(transition_function, automaton_rewards)
         grounder.deepAutoma.double()
         grounder.deepAutoma.to(device)
         grounder.classifier.double()
@@ -214,6 +217,7 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction):
                 #elif method == "nrm":
                 #    grounder..
                 #    deep_automa
+                print(f"State shape: {state.shape}")
 
                 dist, value = model(state)
                 action = dist.sample()
@@ -352,9 +356,9 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction):
             if episode_idx % TT_grounder == 0:
                 worst_trajectories, worst_related_info = prepare_dataset(sequence_accuracy[-TT_grounder:], image_traj,
                                                                          info_traj, TT_grounder)
-                #grounder.set_dataset(worst_trajectories, worst_related_info)
+                grounder.set_dataset(worst_trajectories, worst_related_info)
 
-                #grounder.train_symbol_grounding(grounder_epochs)
+                grounder.train_symbol_grounding(grounder_epochs)
 
                 image_traj = []
                 rew_traj = []

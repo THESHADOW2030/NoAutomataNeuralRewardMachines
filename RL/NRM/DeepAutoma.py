@@ -24,9 +24,9 @@ class ProbabilisticAutoma(nn.Module):
         self.activation = sftmx_with_temp
         #if initialization == "gaussian":
         #standard gaussian noise initialization
-        self.trans_prob = torch.normal(0, 0.1, size=( numb_of_actions, numb_of_states, numb_of_states), requires_grad=False, device=device)
+        self.trans_prob = torch.normal(0, 0.1, size=( numb_of_actions, numb_of_states, numb_of_states), requires_grad=True, device=device)
         self.trans_prob = self.trans_prob.double()
-        self.rew_matrix = torch.normal(0, 0.1, size=( numb_of_states, numb_of_rewards), requires_grad=False, device=device)
+        self.rew_matrix = torch.normal(0, 0.1, size=( numb_of_states, numb_of_rewards), requires_grad=True, device=device)
         self.rew_matrix = self.rew_matrix.double()
         '''
         if initialization == "random_DFA":
@@ -145,8 +145,18 @@ class ProbabilisticAutoma(nn.Module):
         trans_prob = self.activation(self.trans_prob, min_temp)
         rew_matrix = self.activation(self.rew_matrix, min_temp)
 
+        last_label = rew_matrix[-1]
+        print("last label: ", last_label)
+        print(rew_matrix.size())
+
         trans_prob = torch.argmax(trans_prob, dim= 2)
         rew_matrix = torch.argmax(rew_matrix, dim=1)
+        
+        print(rew_matrix.size())
+        exit()
+       
+       #TODO
+        
 
         #2transacc
         trans = {}
@@ -154,7 +164,7 @@ class ProbabilisticAutoma(nn.Module):
             trans[s] = {}
         acc = []
         for i, rew in enumerate(rew_matrix):
-                if rew == 0:
+                if rew == 2030:
                     acc.append(True)
                 else:
                     acc.append(False)
@@ -164,8 +174,8 @@ class ProbabilisticAutoma(nn.Module):
 
      
         pyautomaton = transacc2pythomata(trans, acc, self.alphabet)
-       
-
+      
+ 
         pyautomaton = pyautomaton.reachable()
         
 

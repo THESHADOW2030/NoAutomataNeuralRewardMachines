@@ -8,7 +8,7 @@ from RL.A2C import recurrent_A2C
 from plot import plot
 
 #flags
-absl.flags.DEFINE_string("METHOD", "rnn", "Method to test, one in ['rnn', 'nrm', 'rm'], default= 'rnn' ")
+absl.flags.DEFINE_string("METHOD", "nrm", "Method to test, one in ['rnn', 'nrm', 'rm'], default= 'rnn' ")
 absl.flags.DEFINE_string("ENV", "map_env", "Environment to test, one in ['map_env', 'image_env'], default= 'map_env' ")
 absl.flags.DEFINE_string("LOG_DIR", "Results/", "path where to save the results, default='Results/'")
 absl.flags.DEFINE_integer("NUM_EXPERIMENTS", 5, "num of runs for each test, default= 5")
@@ -33,6 +33,13 @@ def launch_experiments(path, formula, experiment, env_type, method):
         use_dfa_state = False
     elif method == 'rm':
         use_dfa_state = True
+
+        """
+        RUNNARE MARIO con la minimizzazione con più stati e con la minimizzazione aggiustata (9 label finale e basta)
+        
+        """
+
+    print(f"Experiment {experiment} on formula {formula[2]} with method {method} and state type {state_type}")
 
     env = GridWorldEnv(formula, "human", state_type=state_type, use_dfa_state=use_dfa_state, train=False)
     if not os.path.exists(path):
