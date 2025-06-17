@@ -114,8 +114,8 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction):
         f.close()
 
         num_of_states, num_of_symbols, num_automaton_outputs, transition_function, automaton_rewards = env.get_automaton_specs()
-        num_of_states = 20 
-        num_of_symbols = 5
+        #num_of_states = 20 
+        #num_of_symbols = 5
         if env.state_type == "symbolic":
             dataset = "minecraft_location"
         elif env.state_type == "image":
