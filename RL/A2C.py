@@ -6,6 +6,8 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 from statistics import mean
 
+from tqdm import tqdm
+
 from .NN_models import ActorCritic, RNN, Net
 from .NRM.NeuralRewardMachine import NeuralRewardMachine
 from .NRM.utils import eval_acceptance
@@ -148,7 +150,9 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction):
 
     all_mean_rewards = []
     all_mean_rewards_averaged = []
-    while episode_idx < max_episodes:
+    for episode_idx in tqdm(range(max_episodes), desc="Training episodes", unit="episode"):
+
+
         episode_rewards = []
         done = False
         truncated = False
@@ -217,7 +221,7 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction):
                 #elif method == "nrm":
                 #    grounder..
                 #    deep_automa
-                print(f"State shape: {state.shape}")
+                #print(f"State shape: {state.shape}")
 
                 dist, value = model(state)
                 action = dist.sample()

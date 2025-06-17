@@ -29,7 +29,7 @@ class ActorCritic(nn.Module):
         
     def forward(self, x):
 
-        print("X shape: ", x.shape)
+        #print("X shape: ", x.shape)
 
         value = self.critic(x)
         probs = self.actor(x)
