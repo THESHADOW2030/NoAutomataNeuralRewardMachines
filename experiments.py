@@ -9,8 +9,8 @@ from plot import plot
 
 #flags
 absl.flags.DEFINE_string("METHOD", "nrm", "Method to test, one in ['rnn', 'nrm', 'rm'], default= 'rnn' ")
-absl.flags.DEFINE_string("ENV", "map_env", "Environment to test, one in ['map_env', 'image_env'], default= 'map_env' ")
-absl.flags.DEFINE_string("LOG_DIR", "Results/", "path where to save the results, default='Results/'")
+absl.flags.DEFINE_string("ENV", "image_env", "Environment to test, one in ['map_env', 'image_env'], default= 'map_env' ")
+absl.flags.DEFINE_string("LOG_DIR", "Results_image_env/", "path where to save the results, default='Results/'")
 absl.flags.DEFINE_integer("NUM_EXPERIMENTS", 5, "num of runs for each test, default= 5")
 
 
