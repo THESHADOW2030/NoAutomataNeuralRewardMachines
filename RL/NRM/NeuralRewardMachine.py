@@ -241,17 +241,11 @@ class NeuralRewardMachine:
                 max_accuracy = train_accuracy
                 best_classifier = self.classifier
 
-            if self.dataset == "minecraft_location":
-                train_image_classification_accuracy, test_image_classification_accuracy = self.eval_image_classification()
-            else:
-                train_image_classification_accuracy = 0
-                test_image_classification_accuracy = 0
             
             #if epoch % 40 == 0:
             print("__________________________")
             print("MEAN LOSS: ", mean_loss_new)
             print("SEQUENCE CLASSIFICATION (DFA): train accuracy : {}\ttest accuracy : {}".format(train_accuracy, test_accuracy_hard))
-            print("IMAGE CLASSIFICATION: train accuracy : {}\ttest accuracy : {}".format(train_image_classification_accuracy,test_image_classification_accuracy))
 
             mean_loss = mean_loss_new
             sheduler.step(mean_loss)
