@@ -93,9 +93,7 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction, num_of_stat
 
     print(f"num_of_states: {num_of_states}, num_of_symbols: {num_of_symbols}, num_automaton_outputs: {num_automaton_outputs}")
     
-    exit(0)
-    #num_of_states = 20 
-    #num_of_symbols = 5
+    
 
     #################### env dimensions
     # number of actions
