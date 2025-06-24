@@ -332,7 +332,10 @@ class NeuralRewardMachine:
                 break
             mean_loss = mean_loss_new
 
-
+        #save the pickle file with the automa
+        with open(f"./Pickle/NeuralRewardMachines_{self.dataset}/deepAutoma_{self.ltl_formula_string}_exp{self.exp_num}.pkl", 'wb') as outp:
+            pickle.dump(self.deepAutoma, outp, pickle.HIGHEST_PROTOCOL)
+            
         ######################## net2dfa
         #save the minimized dfa
         self.dfa = self.deepAutoma.net2dfa( min_temp)

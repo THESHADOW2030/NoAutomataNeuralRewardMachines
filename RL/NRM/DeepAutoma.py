@@ -164,7 +164,7 @@ class ProbabilisticAutoma(nn.Module):
             trans[s] = {}
         acc = []
         for i, rew in enumerate(rew_matrix):
-                if rew == 2030:
+                if rew == 0:
                     acc.append(True)
                 else:
                     acc.append(False)
@@ -181,6 +181,12 @@ class ProbabilisticAutoma(nn.Module):
 
         pyautomaton = pyautomaton.minimize()
        
+        #self.dfa.to_graphviz().render(self.automata_dir + self.formula_name + "_exp" + str(self.exp_num) + "_minimized_"+mode+".dot")
+        
+
+        #TODO: 30 stati e poi aumentare i simboli       2030
+        #salvare il DFA subito dopo il DFA
+
 
         return pyautomaton
 

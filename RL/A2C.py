@@ -72,7 +72,8 @@ def prepare_dataset(sequence_accuracy, image_trajectory, info_trajectory, TT):
     return worst_trajectories, worst_related_info
 
 
-def recurrent_A2C(env, path, experiment, method, feature_extraction):
+def recurrent_A2C(env, path, experiment, method, feature_extraction, num_of_states=None, num_of_symbols=None):
+    
     #recurrency =
     #       - 'rnn'     (rnn+A2C)
     #       - 'nrm'     (grounding+A2C)
@@ -81,6 +82,20 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction):
     #################### reinitialize files
     f = open(path+"/train_rewards_"+str(experiment)+".txt", "w")
     f.close()
+
+
+
+    num_of_states_override, num_of_symbols_override, num_automaton_outputs, transition_function, automaton_rewards = env.get_automaton_specs()
+    if num_of_states is None:
+        num_of_states = num_of_states_override
+    if num_of_symbols is None:
+        num_of_symbols = num_of_symbols_override
+
+    print(f"num_of_states: {num_of_states}, num_of_symbols: {num_of_symbols}, num_automaton_outputs: {num_automaton_outputs}")
+    
+    exit(0)
+    #num_of_states = 20 
+    #num_of_symbols = 5
 
     #################### env dimensions
     # number of actions
@@ -101,7 +116,7 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction):
         model = ActorCritic(rnn_hidden_size, num_outputs, hidden_size).to(device)
     else:#"nrm" o "rm"
         print(f"PASSING num_inputs: {num_inputs}, num_outputs: {num_outputs}, hidden_size: {hidden_size}")
-        model = ActorCritic(num_inputs + env.automaton.num_of_states, num_outputs, hidden_size).to(device)
+        model = ActorCritic(num_inputs + num_of_states, num_outputs, hidden_size).to(device)
     params += list(model.parameters())
     model.double()
 
@@ -115,9 +130,7 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction):
         f = open(path + "/image_classification_accuracy_" + str(experiment) + ".txt", "w")
         f.close()
 
-        num_of_states, num_of_symbols, num_automaton_outputs, transition_function, automaton_rewards = env.get_automaton_specs()
-        #num_of_states = 20 
-        #num_of_symbols = 5
+
         if env.state_type == "symbolic":
             dataset = "minecraft_location"
         elif env.state_type == "image":
