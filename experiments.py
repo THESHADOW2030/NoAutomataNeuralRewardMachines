@@ -46,10 +46,7 @@ def launch_experiments(path, formula, experiment, env_type, method):
     elif method == "rm":
         use_dfa_state = True
 
-        """
-        RUNNARE MARIO con la minimizzazione con più stati e con la minimizzazione aggiustata (9 label finale e basta)
-        
-        """
+
 
     print(
         f"Experiment {experiment} on formula {formula[2]} with method {method} and state type {state_type}"
