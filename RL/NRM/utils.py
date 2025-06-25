@@ -3,6 +3,8 @@ import random
 import os
 import numpy as np
 from numpy.random import RandomState
+from pythomata import SimpleDFA
+
 
 use_cuda = torch.cuda.is_available()
 device   = torch.device("cuda" if use_cuda else "cpu")

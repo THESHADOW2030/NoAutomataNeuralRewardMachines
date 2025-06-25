@@ -140,7 +140,7 @@ class ProbabilisticAutoma(nn.Module):
 
         return next_state.squeeze(1), next_reward.squeeze(1)
 
-    def net2dfa(self, min_temp):
+    def net2dfa(self, min_temp, name_automata = None):
 
         trans_prob = self.activation(self.trans_prob, min_temp)
         rew_matrix = self.activation(self.rew_matrix, min_temp)
@@ -153,7 +153,6 @@ class ProbabilisticAutoma(nn.Module):
         rew_matrix = torch.argmax(rew_matrix, dim=1)
         
         print(rew_matrix.size())
-        exit()
        
        #TODO
         
@@ -174,12 +173,19 @@ class ProbabilisticAutoma(nn.Module):
 
      
         pyautomaton = transacc2pythomata(trans, acc, self.alphabet)
+        print(f"Saving automata in {name_automata}.dot")
+        if name_automata is not None:
+            pyautomaton.to_graphviz().render(name_automata + ".dot")
       
  
         pyautomaton = pyautomaton.reachable()
         
 
         pyautomaton = pyautomaton.minimize()
+
+        if name_automata is not None:
+            pyautomaton.to_graphviz().render(name_automata + "_minimized.dot")
+        
        
         #self.dfa.to_graphviz().render(self.automata_dir + self.formula_name + "_exp" + str(self.exp_num) + "_minimized_"+mode+".dot")
         

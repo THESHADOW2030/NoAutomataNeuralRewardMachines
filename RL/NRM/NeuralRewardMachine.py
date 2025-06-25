@@ -108,7 +108,6 @@ class NeuralRewardMachine:
 
     def set_dataset(self, image_traj, rew_traj):
 
-        # print(len(rew_traj[0]))
 
         dataset_traces = []
         dataset_acceptances = torch.FloatTensor(rew_traj)
@@ -123,7 +122,7 @@ class NeuralRewardMachine:
         #train_traces, test_traces, train_acceptance_tr, test_acceptance_tr = train_test_split(dataset_traces, dataset_acceptances, train_size=1, shuffle=True)
         train_traces, test_traces, train_acceptance_tr, test_acceptance_tr = (dataset_traces, dataset_traces, dataset_acceptances, dataset_acceptances)
 
-        train_img_seq, train_acceptance_img = create_batches_same_length(train_traces, train_acceptance_tr, 40)
+        train_img_seq, train_acceptance_img = create_batches_same_length(train_traces, train_acceptance_tr, max(1, len(train_traces)))
 
 
         test_img_seq_hard, test_acceptance_img_hard = train_img_seq, train_acceptance_img
@@ -254,6 +253,22 @@ class NeuralRewardMachine:
         self.classifier = best_classifier    
 
 
+        dir_path = self.log_dir+self.ltl_formula_string
+        os.makedirs(dir_path, exist_ok=True)  # Create it if it doesn't exist
+
+        # Now save the pickle
+        with open(f"{dir_path}/deepAutoma_{self.ltl_formula_string}_exp{self.exp_num}.pkl", 'wb') as outp:
+            print(f"Saving the automa in {dir_path}/deepAutoma_{self.ltl_formula_string}_exp{self.exp_num}.pkl")
+            pickle.dump(self.deepAutoma, outp, pickle.HIGHEST_PROTOCOL)
+
+
+
+        dfa = self.deepAutoma.net2dfa(self.temperature, name_automata= self.log_dir+self.ltl_formula_string+"_exp"+str(self.exp_num)+"_grounder")
+
+
+        
+
+
     def train_DFA(self, batch_size, num_of_epochs, decay=0.999, freezed=False):
         def get_lr(optim):
             for param_group in optim.param_groups:
@@ -332,13 +347,21 @@ class NeuralRewardMachine:
                 break
             mean_loss = mean_loss_new
 
-        #save the pickle file with the automa
-        with open(f"./Pickle/NeuralRewardMachines_{self.dataset}/deepAutoma_{self.ltl_formula_string}_exp{self.exp_num}.pkl", 'wb') as outp:
+        print("STO DENTO AL TRAINING DEL DFA")
+        # Construct the directory path
+        dir_path = self.log_dir+self.ltl_formula_string
+        os.makedirs(dir_path, exist_ok=True)  # Create it if it doesn't exist
+
+        # Now save the pickle
+        with open(f"{dir_path}/deepAutoma_{self.ltl_formula_string}_exp{self.exp_num}.pkl", 'wb') as outp:
+            print(f"Saving the automa in {dir_path}/deepAutoma_{self.ltl_formula_string}_exp{self.exp_num}.pkl")
             pickle.dump(self.deepAutoma, outp, pickle.HIGHEST_PROTOCOL)
-            
+        
         ######################## net2dfa
-        #save the minimized dfa
-        self.dfa = self.deepAutoma.net2dfa( min_temp)
+        #save the minimized dfa     CONTINUARE COL NOME 2030
+        self.dfa = self.deepAutoma.net2dfa(min_temp, name_automata= self.log_dir+self.ltl_formula_string+"_exp"+str(self.exp_num)+"")
+
+
         ex_time =  time.time() - start_time
 
         with open("DFA_predicted_nesy/"+self.ltl_formula_string+"_exp"+str(self.exp_num)+".ex_time", "w") as f:
