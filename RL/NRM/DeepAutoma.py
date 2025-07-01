@@ -24,9 +24,9 @@ class ProbabilisticAutoma(nn.Module):
         self.activation = sftmx_with_temp
         #if initialization == "gaussian":
         #standard gaussian noise initialization
-        self.trans_prob = torch.normal(0, 0.1, size=( numb_of_actions, numb_of_states, numb_of_states), requires_grad=True, device=device)
+        self.trans_prob = torch.normal(0, 0.5, size=( numb_of_actions, numb_of_states, numb_of_states), requires_grad=True, device=device)
         self.trans_prob = self.trans_prob.double()
-        self.rew_matrix = torch.normal(0, 0.1, size=( numb_of_states, numb_of_rewards), requires_grad=True, device=device)
+        self.rew_matrix = torch.normal(0, 0.5, size=( numb_of_states, numb_of_rewards), requires_grad=True, device=device)
         self.rew_matrix = self.rew_matrix.double()
         '''
         if initialization == "random_DFA":
