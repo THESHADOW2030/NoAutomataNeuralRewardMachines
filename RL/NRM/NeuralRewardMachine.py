@@ -54,7 +54,8 @@ class NeuralRewardMachine:
         ##### Classifier
         self.dataset = dataset
         if dataset == 'minecraft_image':
-            self.num_classes = 5
+            #self.num_classes = 5
+            self.num_classes = self.numb_of_symbols
             self.num_channels = 3
 
             self.pixels_h = 64
@@ -65,11 +66,11 @@ class NeuralRewardMachine:
 
         if dataset == 'minecraft_location':
             self.num_inputs = 2
-            self.num_classes = 5
-
+            #self.num_classes = 5
+            self.num_classes = sel.numb_of_symbols
             self.classifier = Linear_grounder(self.num_inputs, 8, self.num_classes)
 
-        self.temperature = 1.0
+        self.temperature = 0.5
         #questa resize si può togliere mi sà
         resize = torchvision.transforms.Resize((64,64))
         transforms = torchvision.transforms.Compose([
@@ -208,9 +209,9 @@ class NeuralRewardMachine:
 
                 optimizer.zero_grad()
                 if self.dataset == 'minecraft_image':
-                    sym_sequences = self.classifier(batch_img_seq.view(-1, self.num_channels, self.pixels_v , self.pixels_h))
+                    sym_sequences = self.classifier(batch_img_seq.view(-1, self.num_channels, self.pixels_v , self.pixels_h), self.temperature)
                 else:
-                    sym_sequences = self.classifier(batch_img_seq.double())
+                    sym_sequences = self.classifier(batch_img_seq.double(), self.temperature)
 
                 sym_sequences = sym_sequences.view(batch_size, length_seq, self.numb_of_symbols)
 
