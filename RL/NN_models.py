@@ -1,6 +1,8 @@
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
+import torch 
+
 
 class ActorCritic(nn.Module):
     def __init__(self, num_inputs, num_outputs, hidden_size, std=0.0):

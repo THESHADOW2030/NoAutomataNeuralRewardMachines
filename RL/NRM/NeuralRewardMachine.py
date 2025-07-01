@@ -67,7 +67,7 @@ class NeuralRewardMachine:
         if dataset == 'minecraft_location':
             self.num_inputs = 2
             #self.num_classes = 5
-            self.num_classes = sel.numb_of_symbols
+            self.num_classes = self.numb_of_symbols
             self.classifier = Linear_grounder(self.num_inputs, 8, self.num_classes)
 
         self.temperature = 0.5
