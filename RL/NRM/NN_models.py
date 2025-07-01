@@ -1,6 +1,11 @@
 import torch.nn as nn
 import torch.nn.functional as F
 
+sftmx = torch.nn.Softmax(dim=-1)
+
+def sftmx_with_temp(x, temp):
+    return sftmx(x / temp)
+    
 class CNN_grounder(nn.Module):
     def __init__(self, num_symbols):
         super(CNN_grounder, self).__init__()
@@ -13,7 +18,7 @@ class CNN_grounder(nn.Module):
         self.fc2 = nn.Linear(50, num_symbols)
         self.softmax = nn.Softmax()
 
-    def forward(self, x):
+    def forward(self, x, temp=1):
         x = F.relu(F.max_pool2d(self.conv1(x), 3))
         x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 3))
         # x = F.relu(F.max_pool2d(self.conv2_drop(x), 3))
@@ -22,7 +27,7 @@ class CNN_grounder(nn.Module):
         x = F.relu(self.fc1(x))
         x = F.dropout(x, training=self.training)
         x = self.fc2(x)
-        x = self.softmax(x)
+        x = sftmx_with_temp(x, temp)
         return x
 
 class Linear_grounder_no_droput(nn.Module):
@@ -47,8 +52,8 @@ class Linear_grounder(nn.Module):
             nn.Tanh(),
             nn.Linear(hidden_size, hidden_size),
             nn.Dropout(0.2),
-            nn.Softmax(),
             nn.Linear(hidden_size, num_output),
         )
-    def forward(self, x):
-         return self.grounder(x)
+    def forward(self, x, temp = 1):
+        x = self.grounder(x)
+        return sftmx_with_temp(x, temp)
