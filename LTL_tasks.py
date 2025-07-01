@@ -14,3 +14,17 @@ formulas.append(("F(c0 & F(c1)) & G (! c2) & G(! c3)", 4, "task10: seq_visit({0}
 
 
 #prima seconda terza quinta settima ottava nona decima
+
+#cleanup experiments
+
+"""
+Task 1 -> Task 1
+Task 2 -> Task 2
+Task 3 -> Task 3
+Task 4 -> Task 5
+Task 5 -> Task 7
+Task 6 -> Task 8
+Task 7 -> Task 9
+Task 8 -> Task 10
+
+"""
