@@ -74,6 +74,9 @@ def launch_experiments(path, formula, experiment, env_type, method):
 
 
 def main(argv):
+
+  
+    
     if not os.path.isdir(FLAGS.LOG_DIR):
         os.makedirs(FLAGS.LOG_DIR)
     for formula_idx, formula in enumerate(formulas):

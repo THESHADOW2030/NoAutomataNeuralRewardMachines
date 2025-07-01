@@ -6,10 +6,6 @@ class ActorCritic(nn.Module):
     def __init__(self, num_inputs, num_outputs, hidden_size, std=0.0):
         super(ActorCritic, self).__init__()
 
-        print("num_inputs: ", num_inputs)
-        print("num_outputs: ", num_outputs)
-        print("hidden_size: ", hidden_size)
-
         self.critic = nn.Sequential(
             nn.Linear(num_inputs, hidden_size),
             nn.Tanh(),
