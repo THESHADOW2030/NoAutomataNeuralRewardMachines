@@ -170,7 +170,7 @@ def plot_sequence(source_1, task_category, destination, num_exp):
 SOURCE_PATH_RNN = "Results/RNN_CNN/"
 SOURCE_PATH_GROUND = "Results/GROUNDED_CNN"
 SOURCE_PATH_RM = "Results/RM_CNN"
-DESTINATION_PATH = "Plots/Single_Tasks"
+DESTINATION_PATH = "Plots/Figures"
 
 TASKS = [0, 1, 2, 4, 6, 7, 8, 9]
 # TASKS_1_2_3_5 = [0, 1, 2, 4, 6, 7, 8, 9]
