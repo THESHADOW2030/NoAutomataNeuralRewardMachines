@@ -33,9 +33,15 @@ def plot():
                 info[folder]["env"] = local_info[3]
     print(info)
 
+    
+
     # now enter inside the folder Results_paper/Results_RNN_image_env
     experiments = list(experimets)
+    print(experimets)
+    exit()
     print(len(experimets))
+
+
 
     NUM_EXP = 5
 
@@ -122,8 +128,12 @@ def plot_GPT():
                 info[folder]["states"] = local_info[2]  # Distinguish by state
                 info[folder]["env"] = local_info[3]
 
-    experiments = list(experimets)
+    experiments = sorted(list(experimets))
     NUM_EXP = 5
+
+    print(info)
+    print(f"Found {len(experiments)} experiments: {experiments}")
+    exit()
 
     # Prepare color palette with consistent model names
     model_labels = set()
@@ -189,7 +199,103 @@ def plot_GPT():
             plt.close()
                     
 
+import os
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from tqdm import tqdm
 
+def plot_GPT_classes():
+    PATH_BASE = "./Results_paper/"
+    info = {}
+    experiments = set()
+
+    # Collect info from folder names
+    for folder in os.listdir(PATH_BASE):
+        if folder.startswith("Results_"):
+            folder_name = folder
+            info[folder] = {}
+            local_info = folder_name.split("_")
+            if local_info[1] == "RNN":
+                info[folder]["model"] = "RNN"
+                info[folder]["states"] = ""
+                info[folder]["env"] = local_info[2]
+                if not experiments:
+                    for experiment in os.listdir(os.path.join(PATH_BASE, folder)):
+                        if not experiment.endswith("goal"):
+                            experiments.add(experiment)
+            else:
+                info[folder]["model"] = "NRM"
+                info[folder]["states"] = local_info[2]
+                info[folder]["env"] = local_info[3]
+
+    experiments = sorted(list(experiments))
+    NUM_EXP = 5
+
+    # Prepare color palette
+    model_labels = set()
+    for val in info.values():
+        if val["model"] == "RNN":
+            model_labels.add("RNN")
+        else:
+            model_labels.add(f"NRM {val['states']}")
+    model_labels = sorted(model_labels)
+    palette = dict(zip(model_labels, sns.color_palette(n_colors=len(model_labels))))
+
+    # Task class ranges
+    task_classes = {
+        "class1": experiments[:4],  # task1 to task4
+        "class2": experiments[4:]   # task5 to task8
+    }
+
+    for env in ["image", "map"]:
+        save_path = f"./Figures/{env.capitalize()}_env/"
+        os.makedirs(save_path, exist_ok=True)
+
+        for class_name, task_list in task_classes.items():
+            folder_to_consider = [folder for folder in info if info[folder]["env"] == env]
+            all_data = []
+
+            for experiment in task_list:
+                for folder in tqdm(folder_to_consider, leave=False, desc=f"{experiment} in {env}"):
+                    model = info[folder]["model"]
+                    state = info[folder]["states"]
+                    model_label = model if model == "RNN" else f"NRM {state}"
+                    path = os.path.join(PATH_BASE, folder, experiment)
+
+                    for i in range(NUM_EXP):
+                        file_path = os.path.join(path, f"train_rewards_{i}.txt")
+                        if not os.path.exists(file_path):
+                            continue
+                        with open(file_path, "r") as f:
+                            lines = [float(line.strip()) for line in f]
+                        smoothed = np.convolve(lines, np.ones(100) / 100, mode="valid")
+                        for step, value in enumerate(smoothed):
+                            all_data.append({
+                                "Step": step,
+                                "Reward": value,
+                                "Model": model_label,
+                                "Task": experiment
+                            })
+
+            if not all_data:
+                print(f"No data found for {class_name} in {env}")
+                continue
+
+            df = pd.DataFrame(all_data)
+            plt.figure(figsize=(10, 6))
+            sns.lineplot(data=df, x="Step", y="Reward", hue="Model", palette=palette, errorbar="sd")
+
+            plt.title(f"{env.capitalize()} Environment - {class_name.capitalize()} (Tasks {', '.join(t.split(':')[0] for t in task_list)})")
+            plt.xlabel("Step")
+            plt.ylabel("Reward")
+            plt.legend(title="Model", loc='upper left', bbox_to_anchor=(1, 1))
+            plt.xticks(rotation=45)
+            plt.tight_layout()
+
+            plt.savefig(os.path.join(save_path, f"{env}_env_{class_name}_summary.png"))
+            plt.close()
 
 if __name__ == "__main__":
-    plot_GPT()
+    plot_GPT_classes()
