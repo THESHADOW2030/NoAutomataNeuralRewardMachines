@@ -114,7 +114,10 @@ def eval_acceptance(classifier, automa, alphabet, dataset, automa_implementation
     correct = 0
     test_loss = 0
     classifier.eval()
-    numb_of_symbols = len(alphabet)
+    if type(alphabet) == list:
+        numb_of_symbols = len(alphabet)
+    else:
+        numb_of_symbols = alphabet
     with torch.no_grad():
         for i in range(len(dataset[0])):
             image_sequences = dataset[0][i].to(device)

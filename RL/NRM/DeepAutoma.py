@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from .utils import dot2pythomata, transacc2pythomata
 
+from .Minimization import MinimizableMooreMachine
+
 if torch.cuda.is_available():
     device = 'cuda'
 else:
@@ -182,6 +184,13 @@ class ProbabilisticAutoma(nn.Module):
         
 
         pyautomaton = pyautomaton.minimize()
+
+        pyautomaton, deleted_symbols, alphabet = Minimization.MinimizableMooreMachine(pyautomaton).return_minimized_pydfa()
+
+
+        print("Deleted symbols: ", deleted_symbols)
+
+
 
         if name_automata is not None:
             pyautomaton.to_graphviz().render(name_automata + "_minimized.dot")

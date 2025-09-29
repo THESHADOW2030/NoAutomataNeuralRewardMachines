@@ -24,6 +24,7 @@ absl.flags.DEFINE_integer("NUM_STATES", None, "num of states for the NRM, defaul
 absl.flags.DEFINE_integer(
     "NUM_SYMBOLS", None, "num of symbols for the NRM, default= 30"
 )
+absl.flags.DEFINE_integer("NUM_HIDDEN_SIZE_RNN", 50, "hidden size for the RNN, default= 50")
 
 
 FLAGS = absl.flags.FLAGS
@@ -45,8 +46,6 @@ def launch_experiments(path, formula, experiment, env_type, method):
         use_dfa_state = False
     elif method == "rm":
         use_dfa_state = True
-
-
 
     print(
         f"Experiment {experiment} on formula {formula[2]} with method {method} and state type {state_type}"
@@ -70,13 +69,12 @@ def launch_experiments(path, formula, experiment, env_type, method):
         feature_extraction,
         num_of_states=FLAGS.NUM_STATES,
         num_of_symbols=FLAGS.NUM_SYMBOLS,
+        hidden_size_rnn=FLAGS.NUM_HIDDEN_SIZE_RNN,
     )
 
 
 def main(argv):
 
-  
-    
     if not os.path.isdir(FLAGS.LOG_DIR):
         os.makedirs(FLAGS.LOG_DIR)
     for formula_idx, formula in enumerate(formulas):

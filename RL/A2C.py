@@ -18,7 +18,7 @@ torch.autograd.set_detect_anomaly(True)
 
 
 # max number of episodes
-max_episodes   = 10000
+max_episodes   = 150 #10000
 
 
 # output of rnn
@@ -72,7 +72,7 @@ def prepare_dataset(sequence_accuracy, image_trajectory, info_trajectory, TT):
     return worst_trajectories, worst_related_info
 
 
-def recurrent_A2C(env, path, experiment, method, feature_extraction, num_of_states=None, num_of_symbols=None):
+def recurrent_A2C(env, path, experiment, method, feature_extraction, num_of_states=None, num_of_symbols=None, hidden_size_rnn = 50):
     
     #recurrency =
     #       - 'rnn'     (rnn+A2C)
@@ -82,6 +82,8 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction, num_of_stat
     #################### reinitialize files
     f = open(path+"/train_rewards_"+str(experiment)+".txt", "w")
     f.close()
+
+    rnn_hidden_size = hidden_size_rnn
 
 
 
@@ -93,7 +95,7 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction, num_of_stat
 
     print(f"num_of_states: {num_of_states}, num_of_symbols: {num_of_symbols}, num_automaton_outputs: {num_automaton_outputs}")
     
-    
+
 
     #################### env dimensions
     # number of actions
@@ -332,8 +334,8 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction, num_of_stat
             # calcolare le accuracy su curr_tray curr_info e scriverla su un file
             curr_traj_t = torch.stack(curr_traj).unsqueeze(0)
             curr_info_t = torch.LongTensor(curr_info).unsqueeze(0)
-            acc = eval_acceptance(grounder.classifier, grounder.deepAutoma, env.automaton.alphabet,
-                                  ([curr_traj_t], [curr_info_t]), automa_implementation="logic_circuit")
+            #acc = eval_acceptance(grounder.classifier, grounder.deepAutoma, env.automaton.alphabet, ([curr_traj_t], [curr_info_t]), automa_implementation="logic_circuit")
+            acc = eval_acceptance(grounder.classifier, grounder.deepAutoma, num_of_symbols, ([curr_traj_t], [curr_info_t]), automa_implementation="logic_circuit")
             sequence_accuracy.append(acc)
             with open(path + "/sequence_classification_accuracy_" + str(experiment) + ".txt", "a") as f:
                 f.write("{}\n".format(acc))
@@ -368,6 +370,8 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction, num_of_stat
             #h_0 = h_0.detach()
 
         if method == "nrm":
+            print(f"Episode {episode_idx}, TT_policy {TT_policy}, TT_grounder {TT_grounder}, sequence accuracy (last) {sequence_accuracy[-1]}, image accuracy (last) {image_accuracy[-1]}")
+
             if episode_idx % TT_grounder == 0:
                 worst_trajectories, worst_related_info = prepare_dataset(sequence_accuracy[-TT_grounder:], image_traj,
                                                                          info_traj, TT_grounder)

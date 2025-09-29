@@ -262,9 +262,11 @@ class NeuralRewardMachine:
             print(f"Saving the automa in {dir_path}/deepAutoma_{self.ltl_formula_string}_exp{self.exp_num}.pkl")
             pickle.dump(self.deepAutoma, outp, pickle.HIGHEST_PROTOCOL)
 
+        
 
 
         dfa = self.deepAutoma.net2dfa(self.temperature, name_automata= self.log_dir+self.ltl_formula_string+"_exp"+str(self.exp_num)+"_grounder")
+        
 
 
         
