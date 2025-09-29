@@ -1,0 +1,1 @@
+python experiments.py --METHOD "nrm" --NUM_STATES 30 --LOG_DIR "Results_New/" --ENV "map_env"

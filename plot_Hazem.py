@@ -83,12 +83,12 @@ def plot():
                 # Convert to long-form DataFrame for Seaborn
                 df = pd.DataFrame(results).T  # Transpose so each column is one run
                 df = df.melt(var_name="Run", value_name="Reward")
-                df["Step"] = df.index % len(results[0])
+                df["Episode"] = df.index % len(results[0])
                 
-                sns.lineplot(data=df, x="Step", y="Reward", label=label, errorbar='sd')
+                sns.lineplot(data=df, x="Episode", y="Reward", label=label, errorbar='sd')
 
             plt.title(f"Training Rewards for {experiment} in {env} environment")
-            plt.xlabel("Training Steps")
+            plt.xlabel("Training Episode")
             plt.ylabel("Average Reward")
             plt.legend()
             plt.grid()
@@ -133,7 +133,7 @@ def plot_GPT():
 
     print(info)
     print(f"Found {len(experiments)} experiments: {experiments}")
-    exit()
+    
 
     # Prepare color palette with consistent model names
     model_labels = set()
@@ -145,6 +145,8 @@ def plot_GPT():
 
     model_labels = sorted(model_labels)
     palette = dict(zip(model_labels, sns.color_palette( n_colors=len(model_labels))))
+    print(palette)
+    
 
     for env in ["image", "map"]:
         save_path = f"./Figures/{env.capitalize()}_env/"
@@ -170,9 +172,9 @@ def plot_GPT():
                         lines = [float(line.strip()) for line in f]
                     
                     smoothed = np.convolve(lines, np.ones(100) / 100, mode="valid")
-                    for step, value in enumerate(smoothed):
+                    for Episode, value in enumerate(smoothed):
                         all_data.append({
-                            "Step": step,
+                            "Episode": Episode,
                             "Reward": value,
                             "Model": model_label
                         })
@@ -180,23 +182,66 @@ def plot_GPT():
             if not all_data:
                 print(f"No data found for experiment: {experiment}")
                 continue
+            
+            plt.rcParams.update({
+            'font.size': 18,         # Default text size
+            'axes.titlesize': 30,    # Title font size
+            'axes.labelsize': 30,    # Axis label font size
+            'legend.fontsize': 18,   # Legend font size
+            'xtick.labelsize': 18,   # X-axis tick label font
+            'ytick.labelsize': 18    # Y-axis tick label font
+            })
+
+            #make the text size of the ticks bold
+         
 
             df = pd.DataFrame(all_data)
-            plt.figure(figsize=(10, 6))
-            sns.lineplot(data=df, x="Step", y="Reward", hue="Model", palette=palette, errorbar="sd")
 
-            plt.title(f"{env[0].upper()}{env[1:]} Enviroment - Task {experiment.split(':')[0][-1]}")
-            plt.xlabel("Step")
-            plt.ylabel("Rewards")
-            plt.grid(False)
-            plt.tight_layout()
-            #remove the legend
-            plt.legend(title="Model", loc='upper left', bbox_to_anchor=(1, 1))
-            plt.xticks(rotation=45)
-            plt.tight_layout()
+            # --- Plot and save the main figure WITHOUT the legend ---
+            fig, ax = plt.subplots(figsize=(10, 6))
+            sns.lineplot(data=df, x="Episode", y="Reward", hue="Model", palette=palette, errorbar="sd", ax=ax)
 
-            plt.savefig(os.path.join(save_path, f"{experiment}.png"))
-            plt.close()
+            # Extract legend handles and labels before removing legend
+            handles, labels = ax.get_legend_handles_labels()
+
+            # Remove legend from main plot
+            if ax.get_legend():
+                ax.get_legend().remove()
+
+            # Set title and labels
+            #ax.set_title(f"{env[0].upper()}{env[1:]} Environment - Task {experiment.split(':')[0][-1]}")
+            ax.set_xlabel("Episode")
+            ax.set_ylabel("Rewards")
+            ax.grid(False)
+            ax.tick_params(axis='x', rotation=45)
+            fig.tight_layout()
+
+            ax.tick_params(axis='both', labelsize=20, width=2)  # width controls tick line thickness
+
+            # Set tick line width and color (boldness of the actual ticks)
+            ax.tick_params(axis='both', which='major', width=2, length=7)  # length makes them more visible
+
+            # Set font weight of tick labels to bold
+            for label in ax.get_xticklabels():
+                label.set_fontweight('bold')
+
+            for label in ax.get_yticklabels():
+                label.set_fontweight('bold')
+
+            # Save main plot without legend
+            main_plot_path = os.path.join(save_path, f"{experiment}.png")
+            
+            fig.savefig(main_plot_path, bbox_inches='tight', dpi=300)
+            plt.close(fig)
+
+            # --- Create and save the legend separately ---
+            fig_legend = plt.figure(figsize=(4, 2))
+            fig_legend.legend(handles, labels, title="Model", title_fontsize='medium', loc='center', frameon=True, fancybox=True, edgecolor='black')
+            plt.axis('off')
+
+            legend_path = os.path.join(save_path, f"{experiment}_legend.png")
+            fig_legend.savefig(legend_path, bbox_inches='tight', dpi=300)
+            plt.close(fig_legend)
                     
 
 import os
@@ -242,6 +287,8 @@ def plot_GPT_classes():
             model_labels.add(f"NRM {val['states']}")
     model_labels = sorted(model_labels)
     palette = dict(zip(model_labels, sns.color_palette(n_colors=len(model_labels))))
+    print(palette)
+
 
     # Task class ranges
     task_classes = {
@@ -271,9 +318,9 @@ def plot_GPT_classes():
                         with open(file_path, "r") as f:
                             lines = [float(line.strip()) for line in f]
                         smoothed = np.convolve(lines, np.ones(100) / 100, mode="valid")
-                        for step, value in enumerate(smoothed):
+                        for Episode, value in enumerate(smoothed):
                             all_data.append({
-                                "Step": step,
+                                "Episode": Episode,
                                 "Reward": value,
                                 "Model": model_label,
                                 "Task": experiment
@@ -283,19 +330,51 @@ def plot_GPT_classes():
                 print(f"No data found for {class_name} in {env}")
                 continue
 
+
+
+            plt.rcParams.update({
+            'font.size': 24,         # Default text size
+            'axes.titlesize': 16,    # Title font size
+            'axes.labelsize': 20,    # Axis label font size
+            'legend.fontsize': 12,   # Legend font size
+            'xtick.labelsize': 16,   # X-axis tick label font
+            'ytick.labelsize': 16    # Y-axis tick label font
+})
+
+            # Assuming df, env, class_name, task_list, palette, and save_path are already defined
             df = pd.DataFrame(all_data)
-            plt.figure(figsize=(10, 6))
-            sns.lineplot(data=df, x="Step", y="Reward", hue="Model", palette=palette, errorbar="sd")
 
-            plt.title(f"{env.capitalize()} Environment - {class_name.capitalize()} (Tasks {', '.join(t.split(':')[0] for t in task_list)})")
-            plt.xlabel("Step")
-            plt.ylabel("Reward")
-            plt.legend(title="Model", loc='upper left', bbox_to_anchor=(1, 1))
-            plt.xticks(rotation=45)
-            plt.tight_layout()
+            # --- Plot and save the main figure WITHOUT the legend ---
+            fig, ax = plt.subplots(figsize=(10, 6))
+            sns.lineplot(data=df, x="Episode", y="Reward", hue="Model", palette=palette, errorbar="sd", ax=ax)
 
-            plt.savefig(os.path.join(save_path, f"{env}_env_{class_name}_summary.png"))
-            plt.close()
+            # Extract legend handles and labels BEFORE removing them
+            handles, labels = ax.get_legend_handles_labels()
+
+            # Remove the legend from the main plot
+            ax.legend_.remove()
+
+            ax.set_xlabel("Episode")
+            ax.set_ylabel("Reward")
+            ax.tick_params(axis='x', rotation=45)
+            fig.tight_layout()
+
+            # Save the main figure without the legend
+            main_fig_path = os.path.join(save_path, f"{env}_env_{class_name}_summary.png")
+            fig.savefig(main_fig_path, bbox_inches='tight', dpi=300)
+            plt.close(fig)
+
+            # --- Create and save the legend separately ---
+            fig_legend = plt.figure(figsize=(4, 2))
+            fig_legend.legend(handles, labels, title="Model", title_fontsize='medium', loc='center', frameon=True, fancybox=True, edgecolor='black')
+            plt.axis('off')
+
+            legend_path = os.path.join(save_path, f"{env}_env_{class_name}_legend.png")
+            fig_legend.savefig(legend_path, bbox_inches='tight', dpi=300)
+            plt.close(fig_legend)
+
+
+
 
 if __name__ == "__main__":
-    plot_GPT_classes()
+    plot_GPT()
