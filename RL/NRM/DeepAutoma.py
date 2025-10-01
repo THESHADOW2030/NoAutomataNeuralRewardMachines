@@ -30,6 +30,7 @@ class ProbabilisticAutoma(nn.Module):
         self.trans_prob = self.trans_prob.double()
         self.rew_matrix = torch.normal(0, 0.5, size=( numb_of_states, numb_of_rewards), requires_grad=True, device=device)
         self.rew_matrix = self.rew_matrix.double()
+        
         '''
         if initialization == "random_DFA":
             random_dfa = Random_DFA(self.numb_of_states, self.numb_of_actions)
@@ -152,6 +153,7 @@ class ProbabilisticAutoma(nn.Module):
         print(rew_matrix.size())
 
         trans_prob = torch.argmax(trans_prob, dim= 2)
+        
         rew_matrix = torch.argmax(rew_matrix, dim=1)
         
         print(rew_matrix.size())
@@ -164,8 +166,12 @@ class ProbabilisticAutoma(nn.Module):
         for s in range(self.numb_of_states):
             trans[s] = {}
         acc = []
+
+    
+
+
         for i, rew in enumerate(rew_matrix):
-                if rew == 0:
+                if rew == 2:        #da controllare e chiedere ad elena
                     acc.append(True)
                 else:
                     acc.append(False)
@@ -185,7 +191,7 @@ class ProbabilisticAutoma(nn.Module):
 
         pyautomaton = pyautomaton.minimize()
 
-        pyautomaton, deleted_symbols, alphabet = Minimization.MinimizableMooreMachine(pyautomaton).return_minimized_pydfa()
+        pyautomaton, deleted_symbols, alphabet = MinimizableMooreMachine(pyautomaton).return_minimized_pydfa()
 
 
         print("Deleted symbols: ", deleted_symbols)

@@ -116,9 +116,8 @@ class MinimizableMooreMachine():
     def return_minimized_pydfa(self):
         #eliminate useless symbols
         deleted_symbols = self.eliminate_useless_symbols()
-
         #eliminate useless states
-        pyautomaton = transacc2pythomata(self.transitions, self.acceptance, set(self.alphabet), initial_state=self.init_state)
+        pyautomaton = transacc2pythomata(self.transitions, self.acceptance, set(self.alphabet))
         pyautomaton = pyautomaton.reachable()
         pyautomaton = pyautomaton.minimize()
 

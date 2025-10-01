@@ -18,7 +18,7 @@ torch.autograd.set_detect_anomaly(True)
 
 
 # max number of episodes
-max_episodes   = 150 #10000
+max_episodes   = 10000 #10000
 
 
 # output of rnn
@@ -80,14 +80,18 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction, num_of_stat
     #       - 'rm'    (reward machines)
 
     #################### reinitialize files
-    f = open(path+"/train_rewards_"+str(experiment)+".txt", "w")
+    f = open(path+"/train_rewards_"+str(experiment) +".txt", "w")
     f.close()
 
     rnn_hidden_size = hidden_size_rnn
 
+   
+
 
 
     num_of_states_override, num_of_symbols_override, num_automaton_outputs, transition_function, automaton_rewards = env.get_automaton_specs()
+    #print(f"Overridden num_of_states: {num_of_states_override}, num_of_symbols: {num_of_symbols_override}, num_automaton_outputs: {num_automaton_outputs}")
+    
     if num_of_states is None:
         num_of_states = num_of_states_override
     if num_of_symbols is None:
@@ -136,7 +140,7 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction, num_of_stat
         elif env.state_type == "image":
             dataset = "minecraft_image"
         grounder = NeuralRewardMachine(num_of_states, num_of_symbols, num_automaton_outputs, num_exp=experiment,
-                                       log_dir=path, dataset=dataset)
+                                       log_dir=path + "/", dataset=dataset)
         #grounder.deepAutoma.initFromDfa(transition_function, automaton_rewards)
         grounder.deepAutoma.double()
         grounder.deepAutoma.to(device)

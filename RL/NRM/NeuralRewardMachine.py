@@ -126,10 +126,18 @@ class NeuralRewardMachine:
         train_img_seq, train_acceptance_img = create_batches_same_length(train_traces, train_acceptance_tr, max(1, len(train_traces)))
 
 
-        test_img_seq_hard, test_acceptance_img_hard = train_img_seq, train_acceptance_img
+        #test_img_seq_hard, test_acceptance_img_hard = train_img_seq, train_acceptance_img   #SBAGLIATA
+        test_img_seq_hard, test_acceptance_img_hard = create_batches_same_length(test_traces, test_acceptance_tr, max(1, len(test_traces)))
 
         image_seq_dataset = (train_img_seq, [], train_acceptance_img, test_img_seq_hard, [], test_acceptance_img_hard)
         self.train_img_seq, self.train_traces, self.train_acceptance_img, self.test_img_seq_hard, self.test_traces, self.test_acceptance_img_hard = image_seq_dataset
+
+        #save for future use in a pickle
+        os.makedirs(self.log_dir + "/traces/", exist_ok=True)  # Create it if it doesn't exist
+        with open(f"{self.log_dir}/traces/exp{self.exp_num}.pkl", 'wb') as outp:
+            print(f"Saving the traces in {self.log_dir}/traces/exp{self.exp_num}.pkl")
+            pickle.dump(image_seq_dataset, outp, pickle.HIGHEST_PROTOCOL)
+
         return
 
 
@@ -254,18 +262,18 @@ class NeuralRewardMachine:
         self.classifier = best_classifier    
 
 
-        dir_path = self.log_dir+self.ltl_formula_string
-        os.makedirs(dir_path, exist_ok=True)  # Create it if it doesn't exist
+        
+        os.makedirs(self.log_dir + "/DeepAutoma/", exist_ok=True)  # Create it if it doesn't exist
 
         # Now save the pickle
-        with open(f"{dir_path}/deepAutoma_{self.ltl_formula_string}_exp{self.exp_num}.pkl", 'wb') as outp:
-            print(f"Saving the automa in {dir_path}/deepAutoma_{self.ltl_formula_string}_exp{self.exp_num}.pkl")
+        with open(f"{self.log_dir + '/DeepAutoma'}/exp{self.exp_num}.pkl", 'wb') as outp:
+            print(f"Saving the automa in {self.log_dir + 'DeepAutoma'}exp{self.exp_num}.pkl")
             pickle.dump(self.deepAutoma, outp, pickle.HIGHEST_PROTOCOL)
 
         
 
 
-        dfa = self.deepAutoma.net2dfa(self.temperature, name_automata= self.log_dir+self.ltl_formula_string+"_exp"+str(self.exp_num)+"_grounder")
+        dfa = self.deepAutoma.net2dfa(self.temperature, name_automata= self.log_dir + "/exp"+str(self.exp_num)+"_grounder")
         
 
 

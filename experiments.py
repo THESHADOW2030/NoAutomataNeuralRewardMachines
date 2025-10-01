@@ -27,6 +27,7 @@ absl.flags.DEFINE_integer(
 absl.flags.DEFINE_integer("NUM_HIDDEN_SIZE_RNN", 50, "hidden size for the RNN, default= 50")
 
 
+
 FLAGS = absl.flags.FLAGS
 
 
@@ -80,7 +81,7 @@ def main(argv):
     for formula_idx, formula in enumerate(formulas):
         for experiment in range(FLAGS.NUM_EXPERIMENTS):
             print(f"Experiment {experiment} on formula {formula[2]}")
-            path = FLAGS.LOG_DIR + str(formula[2])
+            path = FLAGS.LOG_DIR + str(formula[2]) + f"/{FLAGS.METHOD}_{FLAGS.ENV}" + f"/NUM_STATES_{FLAGS.NUM_STATES}_NUM_SYMBOLS_{FLAGS.NUM_SYMBOLS}/"
 
             launch_experiments(path, formula, experiment, FLAGS.ENV, FLAGS.METHOD)
         plot(path, FLAGS.NUM_EXPERIMENTS, formula, 100)
