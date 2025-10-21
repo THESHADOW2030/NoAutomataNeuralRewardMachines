@@ -1,5 +1,5 @@
 # Neural Reward Machines
-Official repository for the paper "Neural Reward Machines. Elena Umili, Francesco Argenziano and Roberto Capobianco. 27th European Conference in Artificial Intelligence (ECAI 2024)".
+Repository under development for the paper "Fully Learnable Neural Reward Machines. Hazem Dewidar and Elena Umili. 7th International Workshop on Artificial Intelligence and fOrmal VERification, Logic, Automata, and sYnthesis (OVERLAY@ECAI2025) ".
 
 ## Requirements
 - pytorch
@@ -28,56 +28,14 @@ experiments.py:
 ```
 ## Citations
 ```
-@inproceedings{DBLP:conf/ecai/UmiliAC24,
-  author       = {Elena Umili and
-                  Francesco Argenziano and
-                  Roberto Capobianco},
-  editor       = {Ulle Endriss and
-                  Francisco S. Melo and
-                  Kerstin Bach and
-                  Alberto Jos{\'{e}} Bugar{\'{\i}}n Diz and
-                  Jose Maria Alonso{-}Moral and
-                  Sen{\'{e}}n Barro and
-                  Fredrik Heintz},
-  title        = {Neural Reward Machines},
-  booktitle    = {{ECAI} 2024 - 27th European Conference on Artificial Intelligence,
-                  19-24 October 2024, Santiago de Compostela, Spain - Including 13th
-                  Conference on Prestigious Applications of Intelligent Systems {(PAIS}
-                  2024)},
-  series       = {Frontiers in Artificial Intelligence and Applications},
-  volume       = {392},
-  pages        = {3055--3062},
-  publisher    = {{IOS} Press},
-  year         = {2024},
-  url          = {https://doi.org/10.3233/FAIA240847},
-  doi          = {10.3233/FAIA240847},
-  timestamp    = {Fri, 25 Oct 2024 12:13:46 +0200},
-  biburl       = {https://dblp.org/rec/conf/ecai/UmiliAC24.bib},
-  bibsource    = {dblp computer science bibliography, https://dblp.org}
+@misc{dewidar2025fullylearnableneuralreward,
+      title={Fully Learnable Neural Reward Machines}, 
+      author={Hazem Dewidar and Elena Umili},
+      year={2025},
+      eprint={2509.19017},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2509.19017}, 
 }
 ```
-```
-@inproceedings{UmiliVisualRewardMachines,
-  author       = {Elena Umili and
-                  Francesco Argenziano and
-                  Aymeric Barbin and
-                  Roberto Capobianco},
-  editor       = {Artur S. d'Avila Garcez and
-                  Tarek R. Besold and
-                  Marco Gori and
-                  Ernesto Jim{\'{e}}nez{-}Ruiz},
-  title        = {Visual Reward Machines},
-  booktitle    = {Proceedings of the 17th International Workshop on Neural-Symbolic
-                  Learning and Reasoning, La Certosa di Pontignano, Siena, Italy, July
-                  3-5, 2023},
-  series       = {{CEUR} Workshop Proceedings},
-  volume       = {3432},
-  pages        = {255--267},
-  publisher    = {CEUR-WS.org},
-  year         = {2023},
-  url          = {https://ceur-ws.org/Vol-3432/paper23.pdf},
-  timestamp    = {Tue, 11 Jul 2023 17:14:10 +0200},
-  biburl       = {https://dblp.org/rec/conf/nesy/UmiliABC23.bib},
-  bibsource    = {dblp computer science bibliography, https://dblp.org}
-}
-```
+
