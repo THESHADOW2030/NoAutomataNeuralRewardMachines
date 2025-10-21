@@ -11,30 +11,36 @@ from tqdm import tqdm
 from .NN_models import ActorCritic, RNN, Net
 from .NRM.NeuralRewardMachine import NeuralRewardMachine
 from .NRM.utils import eval_acceptance
+
+from collections import deque
+
 use_cuda = torch.cuda.is_available()
-device   = torch.device("cuda" if use_cuda else "cpu")
+device = torch.device("cuda:1" if use_cuda else "cpu")
 print(device)
 torch.autograd.set_detect_anomaly(True)
 
+import os
+import pickle
+
 
 # max number of episodes
-max_episodes   = 10000 #10000
+max_episodes = 10000  # 10000
 
 
 # output of rnn
 rnn_outputs = 5
 
 # layers of rnn
-num_layers  = 2
+num_layers = 2
 
 # hyper params:
-hidden_size = 120 #of a2c
-rnn_hidden_size = 50 #of rnn
+hidden_size = 120  # of a2c
+rnn_hidden_size = 50  # of rnn
 
 # slidind window
 slide_wind = 100
 
-lr=0.0004
+lr = 0.0004
 
 # we train the policy every num_steps
 num_steps = 5
@@ -44,6 +50,7 @@ grounder_epochs = 100
 
 # we plot the graph every TTT episode
 TTT = 10
+
 
 # Compute the returns (of the rewards) for one episode
 def compute_returns(next_value, rewards, masks, gamma=0.99):
@@ -57,49 +64,64 @@ def compute_returns(next_value, rewards, masks, gamma=0.99):
         returns.insert(0, R)
     return returns
 
+
 def pad_list(lst, desired_length):
     if len(lst) < desired_length and lst:
         lst.extend([lst[-1]] * (desired_length - len(lst)))
     return lst
 
+
 def prepare_dataset(sequence_accuracy, image_trajectory, info_trajectory, TT):
     indices = list(np.argsort(sequence_accuracy))
     indices.reverse()
-    indices = indices[:int(TT/2)]
+    indices = indices[: int(TT / 2)]
 
     worst_trajectories = [image_trajectory[i] for i in indices]
     worst_related_info = [info_trajectory[i] for i in indices]
     return worst_trajectories, worst_related_info
 
 
-def recurrent_A2C(env, path, experiment, method, feature_extraction, num_of_states=None, num_of_symbols=None, hidden_size_rnn = 50):
-    
-    #recurrency =
+def recurrent_A2C(
+    env,
+    path,
+    experiment,
+    method,
+    feature_extraction,
+    num_of_states=None,
+    num_of_symbols=None,
+    hidden_size_rnn=50,
+):
+
+    # recurrency =
     #       - 'rnn'     (rnn+A2C)
     #       - 'nrm'     (grounding+A2C)
     #       - 'rm'    (reward machines)
 
     #################### reinitialize files
-    f = open(path+"/train_rewards_"+str(experiment) +".txt", "w")
+    f = open(path + "/train_rewards_" + str(experiment) + ".txt", "w")
     f.close()
 
     rnn_hidden_size = hidden_size_rnn
 
-   
+    (
+        num_of_states_override,
+        num_of_symbols_override,
+        num_automaton_outputs,
+        transition_function,
+        automaton_rewards,
+    ) = env.get_automaton_specs()
+    # print(f"Overridden num_of_states: {num_of_states_override}, num_of_symbols: {num_of_symbols_override}, num_automaton_outputs: {num_automaton_outputs}")
 
-
-
-    num_of_states_override, num_of_symbols_override, num_automaton_outputs, transition_function, automaton_rewards = env.get_automaton_specs()
-    #print(f"Overridden num_of_states: {num_of_states_override}, num_of_symbols: {num_of_symbols_override}, num_automaton_outputs: {num_automaton_outputs}")
-    
     if num_of_states is None:
         num_of_states = num_of_states_override
     if num_of_symbols is None:
         num_of_symbols = num_of_symbols_override
 
-    print(f"num_of_states: {num_of_states}, num_of_symbols: {num_of_symbols}, num_automaton_outputs: {num_automaton_outputs}")
-    
+    print(
+        f"num_of_states: {num_of_states}, num_of_symbols: {num_of_symbols}, num_automaton_outputs: {num_automaton_outputs}"
+    )
 
+    saved_traces = []
 
     #################### env dimensions
     # number of actions
@@ -118,30 +140,43 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction, num_of_stat
     # Initializing the Actor critic model
     if method == "rnn":
         model = ActorCritic(rnn_hidden_size, num_outputs, hidden_size).to(device)
-    else:#"nrm" o "rm"
-        print(f"PASSING num_inputs: {num_inputs}, num_outputs: {num_outputs}, hidden_size: {hidden_size}")
-        model = ActorCritic(num_inputs + num_of_states, num_outputs, hidden_size).to(device)
+    else:  # "nrm" o "rm"
+        print(
+            f"PASSING num_inputs: {num_inputs}, num_outputs: {num_outputs}, hidden_size: {hidden_size}"
+        )
+        model = ActorCritic(num_inputs + num_of_states, num_outputs, hidden_size).to(
+            device
+        )
     params += list(model.parameters())
     model.double()
 
     if method == "rnn":
-        rnn=RNN(num_inputs, rnn_hidden_size, num_layers).to(device)
+        rnn = RNN(num_inputs, rnn_hidden_size, num_layers).to(device)
         rnn.double()
         params += list(rnn.parameters())
     elif method == "nrm":
-        f = open(path + "/sequence_classification_accuracy_" + str(experiment) + ".txt", "w")
+        f = open(
+            path + "/sequence_classification_accuracy_" + str(experiment) + ".txt", "w"
+        )
         f.close()
-        f = open(path + "/image_classification_accuracy_" + str(experiment) + ".txt", "w")
+        f = open(
+            path + "/image_classification_accuracy_" + str(experiment) + ".txt", "w"
+        )
         f.close()
-
 
         if env.state_type == "symbolic":
             dataset = "minecraft_location"
         elif env.state_type == "image":
             dataset = "minecraft_image"
-        grounder = NeuralRewardMachine(num_of_states, num_of_symbols, num_automaton_outputs, num_exp=experiment,
-                                       log_dir=path + "/", dataset=dataset)
-        #grounder.deepAutoma.initFromDfa(transition_function, automaton_rewards)
+        grounder = NeuralRewardMachine(
+            num_of_states,
+            num_of_symbols,
+            num_automaton_outputs,
+            num_exp=experiment,
+            log_dir=path + "/",
+            dataset=dataset,
+        )
+        # grounder.deepAutoma.initFromDfa(transition_function, automaton_rewards)
         grounder.deepAutoma.double()
         grounder.deepAutoma.to(device)
         grounder.classifier.double()
@@ -154,22 +189,56 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction, num_of_stat
 
         sequence_accuracy = []
         image_accuracy = []
+        # Balanced replay buffers: positive (contains any 1) and non-positive (only 0/-1)
+        class TraceReplayBuffer:
+            def __init__(self, capacity=2000):
+                self.capacity = capacity
+                self.data = deque(maxlen=capacity)
+
+            def add(self, traj, labels):
+                # traj: list[Tensor], labels: list[int]
+                self.data.append((traj, labels))
+
+            def __len__(self):
+                return len(self.data)
+
+            def sample(self, n):
+                if len(self.data) == 0:
+                    return []
+                idxs = np.random.choice(len(self.data), size=min(n, len(self.data)), replace=False)
+                return [self.data[i] for i in idxs]
+
+        positive_buffer = TraceReplayBuffer(capacity=3000)
+        nonpos_buffer = TraceReplayBuffer(capacity=3000)
+        # derive label ids for +1, 0, -1 rewards from env mapping if available
+        
+        pos_label = None
+        
+        neg_label = None
+        if hasattr(env, 'rew_dictionary'):
+            # env.rew_dictionary maps reward_value -> idx
+            if 100 in env.rew_dictionary:
+                pos_label = env.rew_dictionary[100]
+
+        # fallback reasonable defaults
+        if pos_label is None:
+            pos_label = 100
+
 
     optimizer = optim.Adam(params, lr=lr)
 
     # re-initialize episodes
     episode_idx = 0
 
-
     advantage_cat = torch.tensor([]).to(device)
     log_probs_cat = torch.tensor([]).to(device)
 
-
     all_mean_rewards = []
     all_mean_rewards_averaged = []
-    for episode_idx in tqdm(range(max_episodes), desc="Training episodes", unit="episode"):
+    for episode_idx in tqdm(
+        range(max_episodes), desc="Training episodes", unit="episode"
+    ):
 
-        
         episode_rewards = []
         done = False
         truncated = False
@@ -191,7 +260,7 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction, num_of_stat
                 c_0 = torch.zeros(num_layers, rnn_hidden_size).to(device).double()
             elif method == "nrm":
                 # initialize deep automa state
-                state_automa = np.zeros( num_of_states)
+                state_automa = np.zeros(num_of_states)
                 state_automa[0] = 1.0
                 state_automa = torch.tensor(state_automa).to(device)
 
@@ -200,13 +269,15 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction, num_of_stat
                 state = cnn(state.view(-1, 3, 64, 64))
                 state = state.squeeze()
 
-        #first step with RNN or dfa
+        # first step with RNN or dfa
         if method == "rnn":
             out, (h_0, c_0) = rnn(state.unsqueeze(0), h_0, c_0)
             state = out
         elif method == "nrm":
             state_grounding = grounder.classifier(raw_state.unsqueeze(0))
-            next_state_automa, reward_automa = grounder.deepAutoma.step(state_automa.unsqueeze(0), state_grounding, 1.0)
+            next_state_automa, reward_automa = grounder.deepAutoma.step(
+                state_automa.unsqueeze(0), state_grounding, 1.0
+            )
             state_automa = next_state_automa
 
             state = torch.cat((state.unsqueeze(0), state_automa), dim=-1)
@@ -228,17 +299,20 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction, num_of_stat
                 curr_traj.append(raw_state)
                 curr_rew.append(reward)
                 curr_info.append(info)
+                # Push into replay buffers
+                # Positive trace if any timestep has positive label; zero trace if all labels are zero
+                
             # rollout trajectory
             for _ in range(num_steps):
-                #state = torch.tensor(state, dtype=torch.float32)
+                # state = torch.tensor(state, dtype=torch.float32)
                 state = torch.unsqueeze(state, 0)
 
                 state = state.to(device)
 
-                #elif method == "nrm":
+                # elif method == "nrm":
                 #    grounder..
                 #    deep_automa
-                #print(f"State shape: {state.shape}")
+                # print(f"State shape: {state.shape}")
 
                 dist, value = model(state)
                 action = dist.sample()
@@ -251,7 +325,9 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction, num_of_stat
 
                     if feature_extraction:
                         state_env = cnn(state_env.view(-1, 3, 64, 64))
-                    next_state = torch.cat((state_env, state_dfa.unsqueeze(0)), 1).squeeze()
+                    next_state = torch.cat(
+                        (state_env, state_dfa.unsqueeze(0)), 1
+                    ).squeeze()
                 else:
                     next_state = torch.DoubleTensor(next_state).to(device)
 
@@ -262,8 +338,8 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction, num_of_stat
                     #   next_state = concat(stato_env, stato_dfa)
                     raw_state = next_state
                     if feature_extraction:
-                       next_state = cnn(next_state.view(-1, 3, 64, 64))
-                       next_state = next_state.squeeze()
+                        next_state = cnn(next_state.view(-1, 3, 64, 64))
+                        next_state = next_state.squeeze()
 
                     # first step with RNN or dfa
                     if method == "rnn":
@@ -272,15 +348,21 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction, num_of_stat
                     elif method == "nrm":
                         state_grounding = grounder.classifier(raw_state.unsqueeze(0))
 
-                        next_state_automa, reward_automa = grounder.deepAutoma.step(state_automa, state_grounding, 1.0)
+                        next_state_automa, reward_automa = grounder.deepAutoma.step(
+                            state_automa, state_grounding, 1.0
+                        )
                         state_automa = next_state_automa
 
-                        next_state = torch.cat((next_state.unsqueeze(0), next_state_automa), dim=-1)
+                        next_state = torch.cat(
+                            (next_state.unsqueeze(0), next_state_automa), dim=-1
+                        )
                         next_state = state.squeeze()
 
                         curr_traj.append(raw_state)
                         curr_rew.append(reward)
                         curr_info.append(info)
+                        
+                        
 
                 state = next_state
 
@@ -329,8 +411,8 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction, num_of_stat
 
             torch.cuda.empty_cache()
 
-        #EPISODIO FINITO
-        episode_idx +=1
+        # EPISODIO FINITO
+        episode_idx += 1
         all_mean_rewards.append(np.sum(np.array(episode_rewards)))
         all_mean_rewards_averaged.append(mean(all_mean_rewards[-slide_wind:]))
 
@@ -338,17 +420,28 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction, num_of_stat
             # calcolare le accuracy su curr_tray curr_info e scriverla su un file
             curr_traj_t = torch.stack(curr_traj).unsqueeze(0)
             curr_info_t = torch.LongTensor(curr_info).unsqueeze(0)
-            #acc = eval_acceptance(grounder.classifier, grounder.deepAutoma, env.automaton.alphabet, ([curr_traj_t], [curr_info_t]), automa_implementation="logic_circuit")
-            acc = eval_acceptance(grounder.classifier, grounder.deepAutoma, num_of_symbols, ([curr_traj_t], [curr_info_t]), automa_implementation="logic_circuit")
+            # acc = eval_acceptance(grounder.classifier, grounder.deepAutoma, env.automaton.alphabet, ([curr_traj_t], [curr_info_t]), automa_implementation="logic_circuit")
+            acc = eval_acceptance(
+                grounder.classifier,
+                grounder.deepAutoma,
+                num_of_symbols,
+                ([curr_traj_t], [curr_info_t]),
+                automa_implementation="logic_circuit",
+            )
             sequence_accuracy.append(acc)
-            with open(path + "/sequence_classification_accuracy_" + str(experiment) + ".txt", "a") as f:
+            with open(
+                path + "/sequence_classification_accuracy_" + str(experiment) + ".txt",
+                "a",
+            ) as f:
                 f.write("{}\n".format(acc))
             if env.state_type == "symbolic":
                 acc, _ = grounder.eval_image_classification()
             else:
                 acc = 0
             image_accuracy.append(acc)
-            with open(path + "/image_classification_accuracy_" + str(experiment) + ".txt", "a") as f:
+            with open(
+                path + "/image_classification_accuracy_" + str(experiment) + ".txt", "a"
+            ) as f:
                 f.write("{}\n".format(acc))
 
             curr_traj = pad_list(curr_traj, env.max_num_steps + 1)
@@ -358,6 +451,12 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction, num_of_stat
             image_traj.append(curr_traj)
             rew_traj.append(curr_rew)
             info_traj.append(curr_info)
+
+            # Positive buffer if any timestep has label == 1; otherwise (only 0 and/or -1) goes to non-positive buffer
+            if any(lbl == pos_label for lbl in curr_info):
+                positive_buffer.add(curr_traj, curr_info)
+            else:
+                nonpos_buffer.add(curr_traj, curr_info)
 
         if episode_idx % TT_policy == 0:
             log_probs_cat = torch.unsqueeze(log_probs_cat, dim=1)
@@ -371,27 +470,44 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction, num_of_stat
 
             log_probs_cat = torch.tensor([]).to(device)
             advantage_cat = torch.tensor([]).to(device)
-            #h_0 = h_0.detach()
+            # h_0 = h_0.detach()
 
         if method == "nrm":
-            print(f"Episode {episode_idx}, TT_policy {TT_policy}, TT_grounder {TT_grounder}, sequence accuracy (last) {sequence_accuracy[-1]}, image accuracy (last) {image_accuracy[-1]}")
+            print(
+                f"Episode {episode_idx}, TT_policy {TT_policy}, TT_grounder {TT_grounder}, sequence accuracy (last) {sequence_accuracy[-1]}, image accuracy (last) {image_accuracy[-1]}"
+            )
 
             if episode_idx % TT_grounder == 0:
-                worst_trajectories, worst_related_info = prepare_dataset(sequence_accuracy[-TT_grounder:], image_traj,
-                                                                         info_traj, TT_grounder)
-                grounder.set_dataset(worst_trajectories, worst_related_info)
+                # Balanced sampling from replay buffers
+                target_batch = 40  # number of traces to use for this training burst
+                half = target_batch // 2
+                pos_samples = positive_buffer.sample(half)
+                zero_samples = nonpos_buffer.sample(half)
 
-                grounder.train_symbol_grounding(grounder_epochs)
+                sampled = pos_samples + zero_samples
+                if len(sampled) >= 40:  # need at least one full batch for grounder
+                    bat_traj = [traj for (traj, labels) in sampled]
+                    bat_labels = [labels for (traj, labels) in sampled]
+                    grounder.set_dataset(bat_traj, bat_labels)
+                    grounder.train_symbol_grounding(grounder_epochs)
+
+                # clear episodic collectors, keep buffers for future sampling
+                
+                
 
                 image_traj = []
                 rew_traj = []
                 info_traj = []
                 sum_rew_traj = []
-
+            
+            
+        
         if episode_idx % TTT == 0 and len(all_mean_rewards) >= 100:
             ## plot rewards
-            plt.plot([i for i in range(len(all_mean_rewards))], all_mean_rewards_averaged)
-            plt.axhline(y=env.max_reward, color='r', linestyle='--')
+            plt.plot(
+                [i for i in range(len(all_mean_rewards))], all_mean_rewards_averaged
+            )
+            plt.axhline(y=env.max_reward, color="r", linestyle="--")
             plt.xlabel("episode")
             plt.ylabel("mean episode rewards")
             plt.savefig(path + "/ImageEnvMeanRewardsReal_" + str(experiment) + ".png")
@@ -404,12 +520,24 @@ def recurrent_A2C(env, path, experiment, method, feature_extraction, num_of_stat
         f.write(str(ep_reward) + "\n")
         f.close()
         if episode_idx % 100 == 0:
-            print("Mean cumulative reward in the last {} episodes: {}".format(slide_wind,
-                                                                              mean(all_mean_rewards[-slide_wind:])))
+            print(
+                "Mean cumulative reward in the last {} episodes: {}".format(
+                    slide_wind, mean(all_mean_rewards[-slide_wind:])
+                )
+            )
 
         if len(all_mean_rewards) >= 100 and all_mean_rewards_averaged[-1] == 100:
             episode_idx = max_episodes
 
+    # save the cnn state dict in case of feature extraction
+    if feature_extraction:
+        torch.save(
+            cnn.state_dict(), path + "/cnn_state_dict_" + str(experiment) + ".pt"
+        )
 
-
-
+    
+        #save for future use in a pickle and in case in exists, append it
+    os.makedirs(path + "/traces/", exist_ok=True)  # Create it if it doesn't exist
+    with open(f"{path}/traces/exp{str(experiment)}.pkl", 'wb') as outp:
+        print(f"Saving the traces in {path}/traces/exp{str(experiment)}.pkl")
+        #pickle.dump(saved_traces, outp, pickle.HIGHEST_PROTOCOL)

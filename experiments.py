@@ -21,9 +21,7 @@ absl.flags.DEFINE_string(
 )
 absl.flags.DEFINE_integer("NUM_EXPERIMENTS", 5, "num of runs for each test, default= 5")
 absl.flags.DEFINE_integer("NUM_STATES", None, "num of states for the NRM, default= 30")
-absl.flags.DEFINE_integer(
-    "NUM_SYMBOLS", None, "num of symbols for the NRM, default= 30"
-)
+absl.flags.DEFINE_integer("NUM_SYMBOLS", None, "num of symbols for the NRM, default= 5")
 absl.flags.DEFINE_integer("NUM_HIDDEN_SIZE_RNN", 50, "hidden size for the RNN, default= 50")
 
 

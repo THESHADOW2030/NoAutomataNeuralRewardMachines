@@ -141,7 +141,7 @@ class MinimizableMooreMachine():
                     del self.transitions[q][sym]
         return deleted_syms
 
-def minimize_dfa_symbols_and_states(pythomata_dfa):
+def minimize_dfa_symbols_and_states(pythomata_dfa): #fa la full minimization del DFA
     #print(pythomata_dfa.__dict__)
     minMM = MinimizableMooreMachine(pythomata_dfa)
     #print(minMM.__dict__)

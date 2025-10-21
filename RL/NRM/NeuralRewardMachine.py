@@ -11,7 +11,7 @@ from sklearn.model_selection import train_test_split
 
 from .utils import eval_acceptance, eval_learnt_DFA_acceptance, eval_image_classification_from_traces
 if torch.cuda.is_available():
-    device = 'cuda'
+    device = 'cuda:1'
 else:
     device = 'cpu'
 import time
@@ -111,6 +111,7 @@ class NeuralRewardMachine:
 
 
         dataset_traces = []
+        
         dataset_acceptances = torch.FloatTensor(rew_traj)
         for i in range(len(image_traj)):
             trace = []
@@ -132,13 +133,9 @@ class NeuralRewardMachine:
         image_seq_dataset = (train_img_seq, [], train_acceptance_img, test_img_seq_hard, [], test_acceptance_img_hard)
         self.train_img_seq, self.train_traces, self.train_acceptance_img, self.test_img_seq_hard, self.test_traces, self.test_acceptance_img_hard = image_seq_dataset
 
-        #save for future use in a pickle
-        os.makedirs(self.log_dir + "/traces/", exist_ok=True)  # Create it if it doesn't exist
-        with open(f"{self.log_dir}/traces/exp{self.exp_num}.pkl", 'wb') as outp:
-            print(f"Saving the traces in {self.log_dir}/traces/exp{self.exp_num}.pkl")
-            pickle.dump(image_seq_dataset, outp, pickle.HIGHEST_PROTOCOL)
 
-        return
+
+        return image_seq_dataset
 
 
     def eval_learnt_DFA(self, automa_implementation, temp, mode="dev"):

@@ -6,7 +6,7 @@ from .utils import dot2pythomata, transacc2pythomata
 from .Minimization import MinimizableMooreMachine
 
 if torch.cuda.is_available():
-    device = 'cuda'
+    device = 'cuda:1'
 else:
     device = 'cpu'
 
