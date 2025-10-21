@@ -1,4 +1,4 @@
-# Neural Reward Machines
+# Fully Learnable Neural Reward Machines
 Repository under development for the paper "Fully Learnable Neural Reward Machines. Hazem Dewidar and Elena Umili. 7th International Workshop on Artificial Intelligence and fOrmal VERification, Logic, Automata, and sYnthesis (OVERLAY@ECAI2025) ".
 
 ## Requirements
