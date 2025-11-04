@@ -284,14 +284,7 @@ def recurrent_A2C(
 
             state = state.squeeze()
 
-        while not (done or truncated):
-            log_probs = []
-            values = []
-            rewards = []
-            masks = []
-            entropy = 0
-
-            if method == "nrm":
+        if method == "nrm":
                 curr_traj = []
                 curr_rew = []
                 curr_info = []
@@ -302,6 +295,13 @@ def recurrent_A2C(
                 # Push into replay buffers
                 # Positive trace if any timestep has positive label; zero trace if all labels are zero
                 
+        while not (done or truncated):
+            log_probs = []
+            values = []
+            rewards = []
+            masks = []
+            entropy = 0
+
             # rollout trajectory
             for _ in range(num_steps):
                 # state = torch.tensor(state, dtype=torch.float32)
