@@ -3,3 +3,11 @@ LTL_tasks.py
 Old_Results
 Results
 *.pkl
+*.out 
+*.txt
+*.log
+*.svg
+*.png
+*.dot
+*.pyc
+__pycache__/
