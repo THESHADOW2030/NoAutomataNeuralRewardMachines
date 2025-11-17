@@ -7,6 +7,11 @@ from RL.Env.Environment import GridWorldEnv
 from RL.A2C import recurrent_A2C
 from plot import plot
 
+from SymGroundMultiTask.ltl_samplers import SingleFormulaSampler
+from SymGroundMultiTask.utils import make_env
+
+from SymGroundMultiTask.utils.ltl_translation import ltl_str2ast
+
 # flags
 absl.flags.DEFINE_string(
     "METHOD", "nrm", "Method to test, one in ['rnn', 'nrm', 'rm'], default= 'rnn' "
@@ -50,13 +55,46 @@ def launch_experiments(path, formula, experiment, env_type, method):
         f"Experiment {experiment} on formula {formula[2]} with method {method} and state type {state_type}"
     )
 
-    env = GridWorldEnv(
-        formula,
-        "human",
-        state_type=state_type,
-        use_dfa_state=use_dfa_state,
-        train=False,
+
+    print(f"Formula {formula[0]}")
+    
+
+    
+    
+    formula_converted = ltl_str2ast(formula[0])
+
+    print(f"Converted formula {formula_converted}")
+
+    
+
+    
+
+
+
+
+    env = make_env(
+        env_key="GridWorld-12-v0",
+        progression_mode="full",
+        ltl_sampler="SingleFormula",
+        seed=2030,
+        obs_size=(16, 16)
     )
+
+    env.sampler.set_formula(formula_converted)
+
+    env.reset()
+
+   
+
+
+    
+    # env = GridWorldEnv(
+    #     formula,
+    #     "human",
+    #     state_type=state_type,
+    #     use_dfa_state=use_dfa_state,
+    #     train=False,
+    # )
     if not os.path.exists(path):
         os.makedirs(path)
 

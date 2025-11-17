@@ -11,7 +11,7 @@ from sklearn.model_selection import train_test_split
 
 from .utils import eval_acceptance, eval_learnt_DFA_acceptance, eval_image_classification_from_traces
 if torch.cuda.is_available():
-    device = 'cuda:1'
+    device = 'cuda'
 else:
     device = 'cpu'
 import time

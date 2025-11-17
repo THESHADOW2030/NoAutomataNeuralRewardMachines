@@ -1,0 +1,18 @@
+name: symgroundmultitask
+
+channels:
+
+  - conda-forge
+  - dglteam
+  - defaults
+
+dependencies:
+
+  - python=3.7.16
+  - spot=2.9
+  - cudatoolkit=11.7.1
+  - dgl-cuda11.7=0.9.1post1
+
+  - pip
+  - pip:
+      - -r requirements.txt

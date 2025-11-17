@@ -1,0 +1,341 @@
+cuda
+Experiment 0 on formula task1: visit(pickaxe, lava)
+Experiment 0 on formula task1: visit(pickaxe, lava) with method nrm and state type image
+{'_state_attributes': {}, '_transition_attributes': {}, '_initial_state': 0, '_states': {0, 1, 2, 3}, '_final_states': {1}, '_state_counter': 4, '_transition_function': {0: {0: ~c0 & ~c1, 2: c1 & ~c0, 3: c0 & ~c1, 1: c0 & c1}, 3: {3: ~c1, 1: c1}, 1: {1: True}, 2: {2: ~c0, 1: c0}}}
+{0: {1: 2, 0: 3}, 1: {0: 1, 1: 1}, 2: {1: 2, 0: 1}, 3: {0: 3, 1: 1}}
+REWARDS: [0.0, 100.0, 50.0, 50.0]
+MAXIMUM REWARD: 100
+num_of_states: 30, num_of_symbols: 5, num_automaton_outputs: 3
+PASSING num_inputs: 16, num_outputs: 4, hidden_size: 120
+Episode 1, TT_policy 5, TT_grounder 120, sequence accuracy (last) 16.666666666666668, image accuracy (last) 0
+Episode 2, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 3, TT_policy 5, TT_grounder 120, sequence accuracy (last) 50.0, image accuracy (last) 0
+Episode 4, TT_policy 5, TT_grounder 120, sequence accuracy (last) 20.0, image accuracy (last) 0
+Episode 5, TT_policy 5, TT_grounder 120, sequence accuracy (last) 33.333333333333336, image accuracy (last) 0
+Episode 6, TT_policy 5, TT_grounder 120, sequence accuracy (last) 33.333333333333336, image accuracy (last) 0
+Episode 7, TT_policy 5, TT_grounder 120, sequence accuracy (last) 33.333333333333336, image accuracy (last) 0
+Episode 8, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 9, TT_policy 5, TT_grounder 120, sequence accuracy (last) 33.333333333333336, image accuracy (last) 0
+Episode 10, TT_policy 5, TT_grounder 120, sequence accuracy (last) 50.0, image accuracy (last) 0
+Episode 11, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 12, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 13, TT_policy 5, TT_grounder 120, sequence accuracy (last) 16.666666666666668, image accuracy (last) 0
+Episode 14, TT_policy 5, TT_grounder 120, sequence accuracy (last) 50.0, image accuracy (last) 0
+Episode 15, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 16, TT_policy 5, TT_grounder 120, sequence accuracy (last) 20.0, image accuracy (last) 0
+Episode 17, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 18, TT_policy 5, TT_grounder 120, sequence accuracy (last) 16.666666666666668, image accuracy (last) 0
+Episode 19, TT_policy 5, TT_grounder 120, sequence accuracy (last) 50.0, image accuracy (last) 0
+Episode 20, TT_policy 5, TT_grounder 120, sequence accuracy (last) 50.0, image accuracy (last) 0
+Episode 21, TT_policy 5, TT_grounder 120, sequence accuracy (last) 16.666666666666668, image accuracy (last) 0
+Episode 22, TT_policy 5, TT_grounder 120, sequence accuracy (last) 16.666666666666668, image accuracy (last) 0
+Episode 23, TT_policy 5, TT_grounder 120, sequence accuracy (last) 25.0, image accuracy (last) 0
+Episode 24, TT_policy 5, TT_grounder 120, sequence accuracy (last) 33.333333333333336, image accuracy (last) 0
+Episode 25, TT_policy 5, TT_grounder 120, sequence accuracy (last) 20.0, image accuracy (last) 0
+Episode 26, TT_policy 5, TT_grounder 120, sequence accuracy (last) 25.0, image accuracy (last) 0
+Episode 27, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 28, TT_policy 5, TT_grounder 120, sequence accuracy (last) 33.333333333333336, image accuracy (last) 0
+Episode 29, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 30, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 31, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 32, TT_policy 5, TT_grounder 120, sequence accuracy (last) 25.0, image accuracy (last) 0
+Episode 33, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 34, TT_policy 5, TT_grounder 120, sequence accuracy (last) 33.333333333333336, image accuracy (last) 0
+Episode 35, TT_policy 5, TT_grounder 120, sequence accuracy (last) 16.666666666666668, image accuracy (last) 0
+Episode 36, TT_policy 5, TT_grounder 120, sequence accuracy (last) 50.0, image accuracy (last) 0
+Episode 37, TT_policy 5, TT_grounder 120, sequence accuracy (last) 25.0, image accuracy (last) 0
+Episode 38, TT_policy 5, TT_grounder 120, sequence accuracy (last) 50.0, image accuracy (last) 0
+Episode 39, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 40, TT_policy 5, TT_grounder 120, sequence accuracy (last) 16.666666666666668, image accuracy (last) 0
+Episode 41, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 42, TT_policy 5, TT_grounder 120, sequence accuracy (last) 50.0, image accuracy (last) 0
+Episode 43, TT_policy 5, TT_grounder 120, sequence accuracy (last) 16.666666666666668, image accuracy (last) 0
+Episode 44, TT_policy 5, TT_grounder 120, sequence accuracy (last) 25.0, image accuracy (last) 0
+Episode 45, TT_policy 5, TT_grounder 120, sequence accuracy (last) 16.666666666666668, image accuracy (last) 0
+Episode 46, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 47, TT_policy 5, TT_grounder 120, sequence accuracy (last) 20.0, image accuracy (last) 0
+Episode 48, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 49, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 50, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 51, TT_policy 5, TT_grounder 120, sequence accuracy (last) 50.0, image accuracy (last) 0
+Episode 52, TT_policy 5, TT_grounder 120, sequence accuracy (last) 25.0, image accuracy (last) 0
+Episode 53, TT_policy 5, TT_grounder 120, sequence accuracy (last) 16.666666666666668, image accuracy (last) 0
+Episode 54, TT_policy 5, TT_grounder 120, sequence accuracy (last) 16.666666666666668, image accuracy (last) 0
+Episode 55, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 56, TT_policy 5, TT_grounder 120, sequence accuracy (last) 33.333333333333336, image accuracy (last) 0
+Episode 57, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 58, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 59, TT_policy 5, TT_grounder 120, sequence accuracy (last) 20.0, image accuracy (last) 0
+Episode 60, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 61, TT_policy 5, TT_grounder 120, sequence accuracy (last) 50.0, image accuracy (last) 0
+Episode 62, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 63, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 64, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 65, TT_policy 5, TT_grounder 120, sequence accuracy (last) 33.333333333333336, image accuracy (last) 0
+Episode 66, TT_policy 5, TT_grounder 120, sequence accuracy (last) 16.666666666666668, image accuracy (last) 0
+Episode 67, TT_policy 5, TT_grounder 120, sequence accuracy (last) 50.0, image accuracy (last) 0
+Episode 68, TT_policy 5, TT_grounder 120, sequence accuracy (last) 16.666666666666668, image accuracy (last) 0
+Episode 69, TT_policy 5, TT_grounder 120, sequence accuracy (last) 16.666666666666668, image accuracy (last) 0
+Episode 70, TT_policy 5, TT_grounder 120, sequence accuracy (last) 25.0, image accuracy (last) 0
+Episode 71, TT_policy 5, TT_grounder 120, sequence accuracy (last) 50.0, image accuracy (last) 0
+Episode 72, TT_policy 5, TT_grounder 120, sequence accuracy (last) 16.666666666666668, image accuracy (last) 0
+Episode 73, TT_policy 5, TT_grounder 120, sequence accuracy (last) 50.0, image accuracy (last) 0
+Episode 74, TT_policy 5, TT_grounder 120, sequence accuracy (last) 16.666666666666668, image accuracy (last) 0
+Episode 75, TT_policy 5, TT_grounder 120, sequence accuracy (last) 16.666666666666668, image accuracy (last) 0
+Episode 76, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 77, TT_policy 5, TT_grounder 120, sequence accuracy (last) 33.333333333333336, image accuracy (last) 0
+Episode 78, TT_policy 5, TT_grounder 120, sequence accuracy (last) 25.0, image accuracy (last) 0
+Episode 79, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 80, TT_policy 5, TT_grounder 120, sequence accuracy (last) 20.0, image accuracy (last) 0
+Episode 81, TT_policy 5, TT_grounder 120, sequence accuracy (last) 25.0, image accuracy (last) 0
+Episode 82, TT_policy 5, TT_grounder 120, sequence accuracy (last) 16.666666666666668, image accuracy (last) 0
+Episode 83, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 84, TT_policy 5, TT_grounder 120, sequence accuracy (last) 20.0, image accuracy (last) 0
+Episode 85, TT_policy 5, TT_grounder 120, sequence accuracy (last) 25.0, image accuracy (last) 0
+Episode 86, TT_policy 5, TT_grounder 120, sequence accuracy (last) 25.0, image accuracy (last) 0
+Episode 87, TT_policy 5, TT_grounder 120, sequence accuracy (last) 16.666666666666668, image accuracy (last) 0
+Episode 88, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 89, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 90, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 91, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 92, TT_policy 5, TT_grounder 120, sequence accuracy (last) 20.0, image accuracy (last) 0
+Episode 93, TT_policy 5, TT_grounder 120, sequence accuracy (last) 25.0, image accuracy (last) 0
+Episode 94, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 95, TT_policy 5, TT_grounder 120, sequence accuracy (last) 16.666666666666668, image accuracy (last) 0
+Episode 96, TT_policy 5, TT_grounder 120, sequence accuracy (last) 33.333333333333336, image accuracy (last) 0
+Episode 97, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 98, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 99, TT_policy 5, TT_grounder 120, sequence accuracy (last) 16.666666666666668, image accuracy (last) 0
+Episode 100, TT_policy 5, TT_grounder 120, sequence accuracy (last) 33.333333333333336, image accuracy (last) 0
+Mean cumulative reward in the last 100 episodes: 82.5
+Episode 101, TT_policy 5, TT_grounder 120, sequence accuracy (last) 20.0, image accuracy (last) 0
+Episode 102, TT_policy 5, TT_grounder 120, sequence accuracy (last) 20.0, image accuracy (last) 0
+Episode 103, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 104, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 105, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 106, TT_policy 5, TT_grounder 120, sequence accuracy (last) 33.333333333333336, image accuracy (last) 0
+Episode 107, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 108, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 109, TT_policy 5, TT_grounder 120, sequence accuracy (last) 16.666666666666668, image accuracy (last) 0
+Episode 110, TT_policy 5, TT_grounder 120, sequence accuracy (last) 16.666666666666668, image accuracy (last) 0
+Episode 111, TT_policy 5, TT_grounder 120, sequence accuracy (last) 50.0, image accuracy (last) 0
+Episode 112, TT_policy 5, TT_grounder 120, sequence accuracy (last) 50.0, image accuracy (last) 0
+Episode 113, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 114, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 115, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 116, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 117, TT_policy 5, TT_grounder 120, sequence accuracy (last) 25.0, image accuracy (last) 0
+Episode 118, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Episode 119, TT_policy 5, TT_grounder 120, sequence accuracy (last) 33.333333333333336, image accuracy (last) 0
+Episode 120, TT_policy 5, TT_grounder 120, sequence accuracy (last) 0.0, image accuracy (last) 0
+Training the grounder for 100 epochs on 60 trajectories
+_____________training the GROUNDER_____________
+training on 1 sequences using 30 automaton states
+epoch:  0
+__________________________
+MEAN LOSS:  1.03660249710083
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  1
+__________________________
+MEAN LOSS:  1.033092737197876
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  2
+__________________________
+MEAN LOSS:  1.0282562971115112
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  3
+__________________________
+MEAN LOSS:  1.025105357170105
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  4
+__________________________
+MEAN LOSS:  1.0235615968704224
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  5
+__________________________
+MEAN LOSS:  1.020715355873108
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  6
+__________________________
+MEAN LOSS:  1.017804741859436
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  7
+__________________________
+MEAN LOSS:  1.0174857378005981
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  8
+__________________________
+MEAN LOSS:  1.0174689292907715
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  9
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  10
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  11
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  12
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  13
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  14
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  15
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  16
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  17
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  18
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  19
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  20
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  21
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  22
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  23
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  24
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  25
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  26
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  27
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  28
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  29
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  30
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  31
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  32
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  33
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  34
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  35
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  36
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  37
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  38
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  39
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  40
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  41
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  42
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  43
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  44
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  45
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  46
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  47
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  48
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  49
+__________________________
+MEAN LOSS:  1.017469048500061
+SEQUENCE CLASSIFICATION (DFA): train accuracy : 94.70588235294117	test accuracy : 94.70588235294117
+epoch:  50
+Saving the automa in Results/task1: visit(pickaxe, lava)/nrm_image_env/NUM_STATES_30_NUM_SYMBOLS_5//DeepAutomaexp0.pkl
+last label:  tensor([0.2893, 0.2384, 0.4723], device='cuda:0', dtype=torch.float64,
+       grad_fn=<SelectBackward0>)
+torch.Size([30, 3])
+torch.Size([30])
+Saving automata in Results/task1: visit(pickaxe, lava)/nrm_image_env/NUM_STATES_30_NUM_SYMBOLS_5///exp0_grounder.dot
+Deleted symbols:  []

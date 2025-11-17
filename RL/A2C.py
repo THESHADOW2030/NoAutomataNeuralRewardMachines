@@ -15,7 +15,7 @@ from .NRM.utils import eval_acceptance
 from collections import deque
 
 use_cuda = torch.cuda.is_available()
-device = torch.device("cuda:1" if use_cuda else "cpu")
+device = torch.device("cuda" if use_cuda else "cpu")
 print(device)
 torch.autograd.set_detect_anomaly(True)
 
@@ -103,13 +103,17 @@ def recurrent_A2C(
 
     rnn_hidden_size = hidden_size_rnn
 
-    (
-        num_of_states_override,
-        num_of_symbols_override,
-        num_automaton_outputs,
-        transition_function,
-        automaton_rewards,
-    ) = env.get_automaton_specs()
+    num_of_states_override = 5
+    num_of_symbols_override = 5 
+    num_automaton_outputs = 1
+
+    # (
+    #     num_of_states_override,
+    #     num_of_symbols_override,
+    #     num_automaton_outputs,
+    #     transition_function,
+    #     automaton_rewards,
+    # ) = env.get_automaton_specs()
     # print(f"Overridden num_of_states: {num_of_states_override}, num_of_symbols: {num_of_symbols_override}, num_automaton_outputs: {num_automaton_outputs}")
 
     if num_of_states is None:
