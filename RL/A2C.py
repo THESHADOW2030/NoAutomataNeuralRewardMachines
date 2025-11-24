@@ -101,6 +101,9 @@ def recurrent_A2C(
     f = open(path + "/train_rewards_" + str(experiment) + ".txt", "w")
     f.close()
 
+    #IMPORTANTE: STEP E LA MOORE MACHINE NEL INIT DEL VECCHIO ENV (DA METTERE IN LTL_WRAPPERS)
+    #PROVARE A BYPASSARE IL WRAPPER E USARE DIRETTAMENTE L'ENV
+
     rnn_hidden_size = hidden_size_rnn
 
     num_of_states_override = 5

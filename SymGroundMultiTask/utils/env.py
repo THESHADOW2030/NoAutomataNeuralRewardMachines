@@ -27,6 +27,7 @@ def make_env(env_key, progression_mode, ltl_sampler, seed=None, intrinsic=0, noL
         wrapper = NoLTLWrapper(env)
 
     elif "GridWorld" in env_key:
+        
         wrapper = LTLGrounderEnv(
             env=env,
             progression_mode=progression_mode,

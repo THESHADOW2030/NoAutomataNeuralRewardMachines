@@ -40,7 +40,7 @@ class GridWorldEnv(gym.Env):
         self.formula = formula
         self.automaton = MooreMachine(arg1=self.formula[0], arg2=self.formula[1], arg3=self.formula[2], 
                                       reward = "distance", 
-                                      dictionary_symbols=self.dictionary_symbols)
+                                      dictionary_symbols=self.dictionary_symbols) #IMPORTANTE
         self.max_reward = 100 
         print("MAXIMUM REWARD:", self.max_reward)
 
@@ -142,7 +142,7 @@ class GridWorldEnv(gym.Env):
             return 1
         return 4
 
-    def step(self, action):
+    def step(self, action):     #IMPORTANTE
 
         reward = -1
         self.curr_step += 1
