@@ -10,7 +10,7 @@ from SymGroundMultiTask.ltl_wrappers import LTLEnv, NoLTLWrapper, LTLGrounderEnv
 
 
 def make_env(env_key, progression_mode, ltl_sampler, seed=None, intrinsic=0, noLTL=False, 
-    state_type='image', grounder=None, obs_size=None):
+    state_type='image', grounder=None, obs_size=None, formula_old=None, use_dfa_state=True):
 
     kwargs = {} 
     if "GridWorld" in env_key:
@@ -28,11 +28,15 @@ def make_env(env_key, progression_mode, ltl_sampler, seed=None, intrinsic=0, noL
 
     elif "GridWorld" in env_key:
         
+        
         wrapper = LTLGrounderEnv(
             env=env,
             progression_mode=progression_mode,
             ltl_sampler=ltl_sampler,
-            intrinsic=intrinsic
+            intrinsic=intrinsic,
+            formula_old=formula_old,
+            state_type=state_type,
+            use_dfa_state=use_dfa_state
         )
 
     else:

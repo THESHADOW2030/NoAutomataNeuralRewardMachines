@@ -16,7 +16,7 @@ def pad_list(lst, l):
 
 def plot(source_1, source_2, task_category, destination, num_exp):
 
-    env = GridWorldEnv(formulas[0], "rgb_array", "symbolic", use_dfa_state=False, train=False)
+    env = GridWorldEnv(formulas[0], "rgb_array", "symbol", use_dfa_state=False, train=False)
     max_reward = env.max_reward
 
     results_1 = []
@@ -65,7 +65,7 @@ def plot(source_1, source_2, task_category, destination, num_exp):
 
 def triple_plot(source_1, source_2, source_3, task_category, destination, num_exp):
 
-    env = GridWorldEnv(formulas[0], "rgb_array", "symbolic", use_dfa_state=False, train=False)
+    env = GridWorldEnv(formulas[0], "rgb_array", "symbol", use_dfa_state=False, train=False)
     max_reward = env.max_reward
 
     title_count = 1
@@ -132,7 +132,7 @@ def triple_plot(source_1, source_2, source_3, task_category, destination, num_ex
 
 def plot_sequence(source_1, task_category, destination, num_exp):
 
-    env = GridWorldEnv(formulas[0], "rgb_array", "symbolic", use_dfa_state=False, train=False)
+    env = GridWorldEnv(formulas[0], "rgb_array", "symbol", use_dfa_state=False, train=False)
     max_reward = env.max_reward
 
     results_1 = []

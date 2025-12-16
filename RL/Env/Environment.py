@@ -5,6 +5,7 @@ import random
 import numpy as np
 import torch, torchvision
 from .FiniteStateMachine import MooreMachine
+import cv2
 
 resize = torchvision.transforms.Resize((64,64))
 transforms = torchvision.transforms.Compose([
@@ -120,6 +121,7 @@ class GridWorldEnv(gym.Env):
                 one_hot_dfa_state = [0 for _ in range(self.automaton.num_of_states)]
                 one_hot_dfa_state[self.curr_automaton_state] = 1
                 #print("one_hot_dfa_state: ", one_hot_dfa_state)
+                
                 observation = [np.array(one_hot_dfa_state), self.image_locations[self._agent_location[0], self._agent_location[1]]] #1 FULL Img, 0 Just the square the robot is in
             else:
                 observation = self.image_locations[self._agent_location[0], self._agent_location[1]]
@@ -129,6 +131,13 @@ class GridWorldEnv(gym.Env):
         reward = 0
         info = self.rew_dictionary[reward]
 
+
+        print(observation.shape)
+        #save as an image the observation
+        image = (np.transpose(observation.numpy(), (1,2,0)) * 255).astype(np.uint8)
+        cv2.imwrite("./observation_reset.png", image)
+
+        
         return observation, reward, info
 
     def _current_symbol(self):

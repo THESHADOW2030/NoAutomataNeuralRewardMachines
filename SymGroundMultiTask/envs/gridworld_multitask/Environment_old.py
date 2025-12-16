@@ -27,15 +27,10 @@ class GridWorldEnv_multitask(gym.Env):
         '': 'nothing'
     }
 
-    symbol_to_index = { symbol: idx for idx, symbol in enumerate(symbol_to_name.keys()) }
-
-
-    
-
     def __init__(self, render_mode="human", state_type="image", obs_size=(56,56), win_size=(896,896), map_size=7,
         max_num_steps=75, randomize_loc=False, randomize_start=True, img_dir="imgs_16x16", save_obs=False,
         symbols=['a', 'b', 'c', 'd', 'e'], wrap_around_map=True, agent_centric_view=True):
-        
+
         self.dictionary_symbols = symbols + ['']
         self.num_symbols = len(self.dictionary_symbols)
         self.dictionary_icons = [self.symbol_to_name[symbol] for symbol in self.dictionary_symbols[:-1]]
@@ -50,10 +45,6 @@ class GridWorldEnv_multitask(gym.Env):
         self.has_window = False
         self.map_size = map_size
         self.obs_size = obs_size
-        
-        
-        
-        
         self.win_size = win_size
 
         assert not agent_centric_view or (self.map_size%2==1 and wrap_around_map)
@@ -76,8 +67,6 @@ class GridWorldEnv_multitask(gym.Env):
 
         # variables to hide icons
         self.agent_display = True
-
-       
 
         # load icons using OpenCV (if they are used)
         if self.state_type == 'image' or self.render_mode in ['human', 'rgb_array']:
@@ -119,7 +108,13 @@ class GridWorldEnv_multitask(gym.Env):
 
         self.loc_to_labels = {}
         self.loc_to_obs = {}
+        
         self._precompute_observations(save_obs)
+
+        print("#"*100 + "\n")
+        print(self.loc_to_obs[0,0].shape)
+        print(self.state_type)
+        print("\n" + "#"*100)
 
         if self.state_type == "image":
             self.observation_space = spaces.Box(
@@ -136,7 +131,7 @@ class GridWorldEnv_multitask(gym.Env):
         self.agent_location = self.initial_agent_location
 
 
-    def reset(self):  	
+    def reset(self):
 
         self.num_episodes += 1
         self.curr_step = 0
@@ -168,25 +163,9 @@ class GridWorldEnv_multitask(gym.Env):
         # compute initial observation
         observation = self.loc_to_obs[self.agent_location]
 
-        observation = self._get_image_obs()
-
-        
-
-        #save as an image the observation
-        image = (np.transpose(observation) * 255).astype(np.uint8)
-        image_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-
-        #save it in ./
-        obs_folder = os.path.join(REPO_DIR, 'saves/env_obs')
-        if not os.path.exists(obs_folder):
-            os.makedirs(obs_folder)
-        obs_path = os.path.join(obs_folder, f'obs_reset_{self.num_episodes}.png')
-        cv2.imwrite(obs_path, image_bgr)
-        #print(f"Saved observation image at {obs_path}")
-        
-
-
-
+        print(observation.shape)
+        print("AAAaaaaAAAAAAAAAAAAAAÅ")
+              
         return observation
 
 
@@ -448,7 +427,6 @@ class GridWorldEnv_LTL2Action(GridWorldEnv_multitask):
     def step(self, action):
         obs, rew, done, info = super().step(action)
         self.current_obs = obs
-        #da la nostra step dal vecchio env
         return obs, rew, done, info
 
 
@@ -558,6 +536,7 @@ class GridWorldEnv_NoWrapAround_FixedMap(GridWorldEnv_LTL2Action):
 
 class GridWorldEnv_12_Base(GridWorldEnv_LTL2Action):
     def __init__(self, state_type, grounder, obs_size):
+        
         super().__init__(
             state_type = state_type,
             grounder = grounder,

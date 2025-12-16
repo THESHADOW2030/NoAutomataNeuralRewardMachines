@@ -24,12 +24,9 @@ from SymGroundMultiTask.ltl_samplers import getLTLSampler, SequenceSampler
 
 from RL.Env.FiniteStateMachine import MooreMachine
 
-from SymGroundMultiTask.envs.gridworld_multitask.Environment import GridWorldEnv_multitask
-import cv2
-
 class LTLEnv(gym.Wrapper):
 
-    def __init__(self, env, progression_mode="full", ltl_sampler=None, intrinsic=0.0, formula_old=None, state_type="symbol", use_dfa_state=True):
+    def __init__(self, env, progression_mode="full", ltl_sampler=None, intrinsic=0.0, formula_old=None, state_type="symbolic", use_dfa_state=False):
         """
         LTL environment
         --------------------
@@ -57,59 +54,67 @@ class LTLEnv(gym.Wrapper):
         self.sample_on_reset = True
         self.ltl_original = None
         self.task_id = None
-
-
-        self.use_dfa_state = use_dfa_state
-        self.state_type = state_type
         self.formula_old = formula_old
+
+        self.dictionary_symbols = ['P', 'L', 'D', 'G', 'E' ]
+        print("dictionary_symbols:", self.dictionary_symbols)
+        print("formula_old:", self.formula_old)
         self.automaton = MooreMachine(arg1=self.formula_old[0], arg2=self.formula_old[1], arg3=self.formula_old[2], 
                                       reward = "distance", 
-                                      dictionary_symbols= self.env.dictionary_symbols)
-
+                                      dictionary_symbols=self.dictionary_symbols)
         self.max_reward = 100 
         print("MAXIMUM REWARD:", self.max_reward)
-
-        if self.state_type == "symbol":
-            self.state_space_size = 2
 
         self.set_for_dict = set(self.automaton.rewards)
         self.list_rew = sorted(self.set_for_dict)
         self.rew_dictionary = {}
         for idx, reward in enumerate(self.list_rew):
-            self.rew_dictionary[reward]=idx
+            self.rew_dictionary[reward]=idx #IMPORTANTE
 
-        
+        self.state_type = state_type
 
+        if state_type == "symbolic":
+            self.state_space_size = 2
+        elif state_type == "image":
+            self.state_space_size = (3, 64,64)
 
 
     def reset(self):
 
-        self.known_progressions = {}
-        self.obs = self.env.reset()
+        '''
+        TUTTO IL RESET
+        '''
+        self.curr_automaton_state = 0
+        self.curr_step = 0
+        self._agent_location = np.array([0, 0])
 
-        # Defining an LTL goal
-        if self.sample_on_reset:
-            self.ltl_original, self.task_id = self.sample_ltl_goal()
-
-        self.ltl_goal = self.ltl_original
-
-        # Adding the ltl goal to the observation
-        if self.progression_mode == "partial":
-            ltl_obs = {
-                'features': self.obs,
-                'progress_info': self.progress_info(self.ltl_goal)
-            }
+        #if self.render_mode == "human":
+        #    self._render_frame()
+        if self.state_type == "symbolic":
+            if self.use_dfa_state:
+                observation = np.array(list(self._agent_location) + [self.curr_automaton_state])
+            else:
+                observation = np.array(list(self._agent_location))
+        elif self.state_type == "image":
+            if self.use_dfa_state:
+                one_hot_dfa_state = [0 for _ in range(self.automaton.num_of_states)]
+                one_hot_dfa_state[self.curr_automaton_state] = 1
+                #print("one_hot_dfa_state: ", one_hot_dfa_state)
+                observation = [np.array(one_hot_dfa_state), self.image_locations[self._agent_location[0], self._agent_location[1]]] #1 FULL Img, 0 Just the square the robot is in
+            else:
+                observation = self.image_locations[self._agent_location[0], self._agent_location[1]]
         else:
-            ltl_obs = {
-                'features': self.obs,
-                'text': self.ltl_goal
-            }
+            raise Exception("environment with state_type = {} NOT IMPLEMENTED".format(self.state_type))
 
-        return ltl_obs
+        reward = 0
+        info = self.rew_dictionary[reward]
+        
+        return observation, reward, info
+
 
 
     def step(self, action):
-        
+
         int_reward = 0
         # executing the action in the environment
         next_obs, original_reward, env_done, info = self.env.step(action)
@@ -153,6 +158,7 @@ class LTLEnv(gym.Wrapper):
         reward = original_reward + ltl_reward
         done = env_done or ltl_done
         return ltl_obs, reward, done, info
+    
 
 
     def render(self):
@@ -225,8 +231,8 @@ class NoLTLWrapper(gym.Wrapper):
 
 
     def reset(self):
-        obs = self.env.reset()
-        return obs
+        obs, reward, info = self.env.reset()
+        return obs, reward, info
 
 
     def step(self, action):
@@ -256,119 +262,41 @@ class LTLGrounderEnv(LTLEnv):
         self.id = LTLGrounderEnv.num_envs
         LTLGrounderEnv.num_envs += 1
 
-        print(self.env.dictionary_symbols)
-        print(self.env.num_symbols)
-        self.set_for_dict = set(self.automaton.rewards)
-        self.list_rew = sorted(self.set_for_dict)
-        self.rew_dictionary = {}
-        for idx, reward in enumerate(self.list_rew):
-            self.rew_dictionary[reward]=idx
-
-        self.task = self.formula_old[2]
-        
-
-        
-
-        
-    def get_automaton_specs(self):
-        num_of_states = self.automaton.num_of_states
-        num_of_symbols = len(self.env.dictionary_symbols)
-        num_outputs = len(self.list_rew)
-        transition_function = self.automaton.transitions
-        automaton_rewards = [self.rew_dictionary[rew] for rew in self.automaton.rewards]
-        return num_of_states, num_of_symbols, num_outputs, transition_function, automaton_rewards
-
-
 
     def reset(self):
 
-        #ATTENZIONE: QUI CHIAMA IL RESET DEL ENV 
+        obs, reward, info = self.env.reset()
 
-        self.known_progressions = {}
-        self.curr_step = 0
-        self.obs = self.env.reset()
-
-        self.curr_automaton_state = 0
+        return obs, reward, info
 
 
-        if self.state_type == "symbol":
-            if self.use_dfa_state:
-                observation = np.array(list(
-                    self.env.agent_location) + list[self.curr_automaton_state]
-                )
-            else:
-                observation = np.array(list(
-                    self.env.agent_location)
-                )
-        elif self.state_type == "image":
-            if self.use_dfa_state:
-                one_hot_dfa_state = [0 for _ in range(self.automaton.num_of_states)]
-                one_hot_dfa_state[self.curr_automaton_state] = 1
-                observation = [np.array(one_hot_dfa_state), self.obs]
+    def step(self, action):     #IMPORTANTE
 
-            else:
-                observation = self.obs
-        else:
-            raise Exception("environment with state_type = {} NOT IMPLEMENTED".format(self.state_type))
-
-
-        self.obs = observation
-        
-        
-    
-
-
-        # sample an LTL goal
-        if self.sample_on_reset:
-            self.ltl_original, self.task_id = self.sample_ltl_goal()
-
-        # initialize progressed LTL goal
-        self.real_ltl_goal = self.ltl_original
-        self.pred_ltl_goal = self.ltl_original
-
-        # adding the ltl goal to the observation
-        if self.progression_mode == "partial":
-            ltl_obs = {
-                'features': self.obs,
-                'progress_info': self.progress_info(self.pred_ltl_goal),
-                'step': self.curr_step,
-                'task_id': self.task_id,
-                'episode_id': self.env.num_episodes,
-                'env_id': self.id
-            }
-        else:
-            ltl_obs = {
-                'features': self.obs,
-                'text': self.pred_ltl_goal,
-                'step': self.curr_step,
-                'task_id': self.task_id,
-                'episode_id': self.env.num_episodes,
-                'env_id': self.id
-            }
-
-        reward = 0.0
-        info = self._get_info(reward)
-
-        return ltl_obs["features"], reward, info
-
-
-    def step(self, action):
-        
-        int_reward = 0.0
+        reward = -1
         self.curr_step += 1
+        done = False
 
-        # executing the action in the environment. The returned reward is 0 and info is None
-        next_obs, env_reward, env_done, info = self.env.step(action)
-       
+        # MOVEMENT
+        if action == 0:
+            direction = np.array([0, 1])
+        elif action == 1:
+            direction = np.array([1, 0])
+        elif action == 2:
+            direction = np.array([0, -1])
+        elif action == 3:
+            direction = np.array([-1, 0])
 
-        # progressing real ltl formula
-        real_label = self.env.get_real_events()
-       
-        index_label = GridWorldEnv_multitask.symbol_to_index[real_label]
-        
-        
-        self.new_automaton_state = self.automaton.transitions[self.curr_automaton_state][index_label]
+        self._agent_location = np.clip(self._agent_location + direction, 0, self.size - 1)
 
+        sym = self._current_symbol()
+        #print("symbol:", sym)
+        self.new_automaton_state = self.automaton.transitions[self.curr_automaton_state][sym]
+        #print("state:", self.curr_automaton_state)
+        #print(self.automaton.acceptance)
+
+        #if self.automaton.acceptance[self.curr_automaton_state]:
+        #    reward = 100
+        #    done = True
         if self.new_automaton_state == self.curr_automaton_state:
             reward = 0
         else:
@@ -376,112 +304,42 @@ class LTLGrounderEnv(LTLEnv):
         potential = self.automaton.rewards[self.new_automaton_state]
         self.curr_automaton_state = self.new_automaton_state
 
+        #if self.render_mode == "human":
+        #    self._render_frame()
 
-        if self.state_type == "symbol":
+        if self.state_type == "symbolic":
             if self.use_dfa_state:
-                observation = np.array(list(
-                    self.env.agent_location) + list[self.curr_automaton_state]
-                )
+                observation = np.array(list(self._agent_location) + [self.curr_automaton_state])
             else:
-                observation = np.array(list(
-                    self.env.agent_location)
-                )
+                observation = np.array(list(self._agent_location))
         elif self.state_type == "image":
             if self.use_dfa_state:
                 one_hot_dfa_state = [0 for _ in range(self.automaton.num_of_states)]
                 one_hot_dfa_state[self.curr_automaton_state] = 1
-                observation = [np.array(one_hot_dfa_state), next_obs]
-
+                #print("one_hot_dfa_state: ", one_hot_dfa_state)
+                observation = [np.array(one_hot_dfa_state), self.image_locations[self._agent_location[0], self._agent_location[1]]]
             else:
-                observation = next_obs
+                observation = self.image_locations[self._agent_location[0], self._agent_location[1]]
+
         else:
             raise Exception("environment with state_type = {} NOT IMPLEMENTED".format(self.state_type))
-        
-        next_obs = observation
-
-        
-        
-        self.real_ltl_goal = self.progression(self.real_ltl_goal, real_label)
-
-        # progressing pred ltl formula
-        pred_label = self.env.get_events()
-        self.pred_ltl_goal = self.progression(self.pred_ltl_goal, pred_label)
-
-        self.obs = next_obs
-
-        # computing real reward and done
-        if self.real_ltl_goal == 'True':
-            real_ltl_reward = 1.0
-            real_ltl_done = True
-        elif self.real_ltl_goal == 'False':
-            real_ltl_reward = -1.0
-            real_ltl_done = True
-        else:
-            real_ltl_reward = 0.0
-            real_ltl_done = False
-
-        # computing pred reward and done
-        if self.pred_ltl_goal == 'True':
-            pred_ltl_reward = 1.0
-            pred_ltl_done = True
-        elif self.pred_ltl_goal == 'False':
-            pred_ltl_reward = -1.0
-            pred_ltl_done = True
-        else:
-            pred_ltl_reward = int_reward
-            pred_ltl_done = False
-
-        # computing the new observation and returning the outcome of this action
-        # the observation considers the expected formula (unless using 'real')
-        if self.progression_mode == "full":
-            ltl_obs = {
-                'features': self.obs,
-                'text': self.pred_ltl_goal,
-                'step': self.curr_step,
-                'task_id': self.task_id,
-                'episode_id': self.env.num_episodes,
-                'env_id': self.id
-            }
-        elif self.progression_mode == "none":
-            ltl_obs = {
-                'features': self.obs,
-                'text': self.ltl_original,
-                'step': self.curr_step,
-                'task_id': self.task_id,
-                'episode_id': self.env.num_episodes,
-                'env_id': self.id
-            }
-        elif self.progression_mode == "partial":
-            ltl_obs = {
-                'features': self.obs,
-                'progress_info': self.progress_info(self.pred_ltl_goal),
-                'step': self.curr_step,
-                'task_id': self.task_id,
-                'episode_id': self.env.num_episodes,
-                'env_id': self.id
-            }
-        elif self.progression_mode == "real":
-            ltl_obs = {
-                'features': self.obs,
-                'text': self.real_ltl_goal,
-                'step': self.curr_step,
-                'task_id': self.task_id,
-                'episode_id': self.env.num_episodes,
-                'env_id': self.id
-            }
-        else:
-            raise NotImplementedError
-
-        # the reward considers the real evolution of the formula
-        #reward = env_reward + real_ltl_reward
-
-        # the termination checks both real termination or expected one
+            
+        #          success            failure                  timeout
         done = (potential == 100) or (potential == -100)
-        truncated = self.curr_step >= 1000
+        truncated = (self.curr_step >= self.max_num_steps)
 
         info = self._get_info(potential)
 
-        return self.obs, reward, done, truncated, info
+        return observation, reward, done, truncated, info#, sym
+
+    def get_automaton_specs(self):
+        num_of_states = self.automaton.num_of_states
+        num_of_symbols = len(self.dictionary_symbols)
+        num_outputs = len(self.list_rew)
+        transition_function = self.automaton.transitions
+        automaton_rewards = [self.rew_dictionary[rew] for rew in self.automaton.rewards]
+        return num_of_states, num_of_symbols, num_outputs, transition_function, automaton_rewards
+
 
 
     # returns formula and id
@@ -489,9 +347,3 @@ class LTLGrounderEnv(LTLEnv):
         goal_formula = self.sampler.sample()
         goal_id = self.sampler.get_current_id()
         return goal_formula, goal_id
-    
-    def _get_info(self, reward):
-        
-        info = self.rew_dictionary[reward]
-
-        return info

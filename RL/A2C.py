@@ -97,26 +97,36 @@ def recurrent_A2C(
     #       - 'nrm'     (grounding+A2C)
     #       - 'rm'    (reward machines)
 
-    #################### reinitialize files
+    
+
+    #################### reinitialize files if they exist or create them
+
     f = open(path + "/train_rewards_" + str(experiment) + ".txt", "w")
     f.close()
 
     #IMPORTANTE: STEP E LA MOORE MACHINE NEL INIT DEL VECCHIO ENV (DA METTERE IN LTL_WRAPPERS)
     #PROVARE A BYPASSARE IL WRAPPER E USARE DIRETTAMENTE L'ENV
 
+
+    #STEP FATTO
+
     rnn_hidden_size = hidden_size_rnn
 
-    num_of_states_override = 5
-    num_of_symbols_override = 5 
-    num_automaton_outputs = 1
+    # num_of_states_override = 5
+    # num_of_symbols_override = 5 
+    # num_automaton_outputs = 1
 
-    # (
-    #     num_of_states_override,
-    #     num_of_symbols_override,
-    #     num_automaton_outputs,
-    #     transition_function,
-    #     automaton_rewards,
-    # ) = env.get_automaton_specs()
+    # print(env.__module__)
+    # #print the class name of the env
+    # print(env.__class__.__name__)
+
+    (
+        num_of_states_override,
+        num_of_symbols_override,
+        num_automaton_outputs,
+        transition_function,
+        automaton_rewards,
+    ) = env.get_automaton_specs()
     # print(f"Overridden num_of_states: {num_of_states_override}, num_of_symbols: {num_of_symbols_override}, num_automaton_outputs: {num_automaton_outputs}")
 
     if num_of_states is None:
@@ -130,6 +140,7 @@ def recurrent_A2C(
 
     saved_traces = []
 
+    
     #################### env dimensions
     # number of actions
     num_outputs = env.action_space.n
@@ -143,6 +154,8 @@ def recurrent_A2C(
         params += list(cnn.parameters())
     else:
         num_inputs = env.state_space_size
+        #num_inputs = env.observation_space.shape
+        #print(f"env.observation_space.shape: {env.observation_space.shape}")
 
     # Initializing the Actor critic model
     if method == "rnn":
@@ -151,6 +164,7 @@ def recurrent_A2C(
         print(
             f"PASSING num_inputs: {num_inputs}, num_outputs: {num_outputs}, hidden_size: {hidden_size}"
         )
+
         model = ActorCritic(num_inputs + num_of_states, num_outputs, hidden_size).to(
             device
         )
@@ -171,7 +185,7 @@ def recurrent_A2C(
         )
         f.close()
 
-        if env.state_type == "symbolic":
+        if env.state_type == "symbol":
             dataset = "minecraft_location"
         elif env.state_type == "image":
             dataset = "minecraft_image"
@@ -249,7 +263,13 @@ def recurrent_A2C(
         episode_rewards = []
         done = False
         truncated = False
+
+        
         obs, reward, info = env.reset()
+
+        #print the path of the module env
+        # print(f"Module env path: {env.__module__}")
+        # print(f"Initial observation shape: {obs.shape}")
 
         if method == "rm":
             state_dfa = torch.DoubleTensor(obs[0]).to(device)
@@ -260,7 +280,7 @@ def recurrent_A2C(
             state = torch.cat((state_env, state_dfa.unsqueeze(0)), 1).squeeze()
         else:
             state = torch.DoubleTensor(obs).to(device)
-
+            #print(f"Initial state shape: {state.shape}")
             if method == "rnn":
                 # Initialize hidden and cell states
                 h_0 = torch.zeros(num_layers, rnn_hidden_size).to(device).double()
@@ -441,7 +461,7 @@ def recurrent_A2C(
                 "a",
             ) as f:
                 f.write("{}\n".format(acc))
-            if env.state_type == "symbolic":
+            if env.state_type == "symbol":
                 acc, _ = grounder.eval_image_classification()
             else:
                 acc = 0

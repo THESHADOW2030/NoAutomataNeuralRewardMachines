@@ -38,7 +38,7 @@ def launch_experiments(path, formula, experiment, env_type, method):
     set_seed(experiment)
 
     if env_type == "map_env":
-        state_type = "symbolic"
+        state_type = "symbol"
         feature_extraction = False
     elif env_type == "image_env":
         state_type = "image"
@@ -77,7 +77,10 @@ def launch_experiments(path, formula, experiment, env_type, method):
         progression_mode="full",
         ltl_sampler="SingleFormula",
         seed=2030,
-        obs_size=(16, 16)
+        obs_size=(64, 64),
+        formula_old=formula,
+        use_dfa_state=use_dfa_state,
+        state_type=state_type,
     )
 
     env.sampler.set_formula(formula_converted)
@@ -95,8 +98,14 @@ def launch_experiments(path, formula, experiment, env_type, method):
     #     use_dfa_state=use_dfa_state,
     #     train=False,
     # )
+
+
+    
+    
     if not os.path.exists(path):
-        os.makedirs(path)
+         os.makedirs(path)
+   
+    # exit()
 
     recurrent_A2C(
         env,
