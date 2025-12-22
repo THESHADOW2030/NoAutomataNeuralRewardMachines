@@ -70,7 +70,7 @@ class NeuralRewardMachine:
             self.num_classes = self.numb_of_symbols
             self.classifier = Linear_grounder(self.num_inputs, 8, self.num_classes)
 
-        self.temperature = 0.5
+        self.temperature = 1
         #questa resize si può togliere mi sà
         resize = torchvision.transforms.Resize((64,64))
         transforms = torchvision.transforms.Compose([
@@ -192,6 +192,7 @@ class NeuralRewardMachine:
                 length_seq = batch_img_seq.size()[1]
                 target_rew_seq = self.train_acceptance_img[b].type(torch.int64).to(device)
 
+
                 optimizer.zero_grad()
                 if self.dataset == 'minecraft_image':
                     sym_sequences = self.classifier(batch_img_seq.view(-1, self.num_channels, self.pixels_v , self.pixels_h), self.temperature)
@@ -204,7 +205,20 @@ class NeuralRewardMachine:
 
                 pred_rew = pred_rew.view(-1, self.numb_of_rewards).to(device)
                 target_rew = target_rew_seq.view(-1)
+
+                print("batch size: ", batch_size)
+               
+                print("rew target: ", target_rew[0:20])
+                print("rew pred: ", pred_rew[0:20])
+            
+                
+                
+
+                
+
                 loss = cross_entr(pred_rew, target_rew)
+
+                #loss = cross_entr(pred_rew*100, target_rew) +
 
                 loss.backward()
                 optimizer.step()

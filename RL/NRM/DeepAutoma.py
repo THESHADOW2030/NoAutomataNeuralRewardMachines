@@ -71,16 +71,20 @@ class ProbabilisticAutoma(nn.Module):
         return pred_states, pred_rew
 
     def step(self, state, action, temp):
+
+        
         
         if type(action) == int:
             action= torch.IntTensor([action])
         #activation
+        temp = 1.0e-3
         trans_prob = self.activation(self.trans_prob, temp)
-        #rew_matrix = self.activation(self.rew_matrix, temp)
+        
+        rew_matrix = self.activation(self.rew_matrix, temp)
         #no activation
-        #trans_prob = self.trans_prob
-        rew_matrix = self.rew_matrix
-      
+        #trans_prob = self.trans_prob    #
+       #rew_matrix = self.rew_matrix #TODO COMMENTA QUESTA NEL CASO 
+        
         trans_prob = trans_prob.unsqueeze(0)
         state = state.unsqueeze(1).unsqueeze(-2)
 

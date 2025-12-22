@@ -71,7 +71,6 @@ def launch_experiments(path, formula, experiment, env_type, method):
 
 
 
-
     env = make_env(
         env_key="GridWorld-12-v0",
         progression_mode="full",

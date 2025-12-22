@@ -359,6 +359,8 @@ class LTLGrounderEnv(LTLEnv):
 
         # executing the action in the environment. The returned reward is 0 and info is None
         next_obs, env_reward, env_done, info = self.env.step(action)
+
+        
        
 
         # progressing real ltl formula
@@ -376,7 +378,8 @@ class LTLGrounderEnv(LTLEnv):
         potential = self.automaton.rewards[self.new_automaton_state]
         self.curr_automaton_state = self.new_automaton_state
 
-
+        
+        
         if self.state_type == "symbol":
             if self.use_dfa_state:
                 observation = np.array(list(
@@ -401,35 +404,16 @@ class LTLGrounderEnv(LTLEnv):
 
         
         
-        self.real_ltl_goal = self.progression(self.real_ltl_goal, real_label)
+        #self.real_ltl_goal = self.progression(self.real_ltl_goal, real_label)
 
         # progressing pred ltl formula
-        pred_label = self.env.get_events()
-        self.pred_ltl_goal = self.progression(self.pred_ltl_goal, pred_label)
+        #pred_label = self.env.get_events()
+        #self.pred_ltl_goal = self.progression(self.pred_ltl_goal, pred_label)
 
         self.obs = next_obs
 
-        # computing real reward and done
-        if self.real_ltl_goal == 'True':
-            real_ltl_reward = 1.0
-            real_ltl_done = True
-        elif self.real_ltl_goal == 'False':
-            real_ltl_reward = -1.0
-            real_ltl_done = True
-        else:
-            real_ltl_reward = 0.0
-            real_ltl_done = False
-
-        # computing pred reward and done
-        if self.pred_ltl_goal == 'True':
-            pred_ltl_reward = 1.0
-            pred_ltl_done = True
-        elif self.pred_ltl_goal == 'False':
-            pred_ltl_reward = -1.0
-            pred_ltl_done = True
-        else:
-            pred_ltl_reward = int_reward
-            pred_ltl_done = False
+        
+        
 
         # computing the new observation and returning the outcome of this action
         # the observation considers the expected formula (unless using 'real')
@@ -477,10 +461,10 @@ class LTLGrounderEnv(LTLEnv):
 
         # the termination checks both real termination or expected one
         done = (potential == 100) or (potential == -100)
-        truncated = self.curr_step >= 1000
+        truncated = self.curr_step >= self.env.max_num_steps
 
         info = self._get_info(potential)
-
+        
         return self.obs, reward, done, truncated, info
 
 

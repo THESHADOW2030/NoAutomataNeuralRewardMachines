@@ -13,7 +13,8 @@ from .NRM.NeuralRewardMachine import NeuralRewardMachine
 from .NRM.utils import eval_acceptance
 
 from collections import deque
-
+import numpy as np
+import cv2
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 print(device)
@@ -45,7 +46,7 @@ lr = 0.0004
 # we train the policy every num_steps
 num_steps = 5
 TT_policy = 5
-TT_grounder = 120
+TT_grounder = 10
 grounder_epochs = 100
 
 # we plot the graph every TTT episode
@@ -109,6 +110,8 @@ def recurrent_A2C(
 
 
     #STEP FATTO
+
+    
 
     rnn_hidden_size = hidden_size_rnn
 
@@ -346,6 +349,12 @@ def recurrent_A2C(
 
                 next_state, reward, done, truncated, info = env.step(action.item())
 
+                
+
+
+                
+                
+
                 if method == "rm":
                     state_dfa = torch.DoubleTensor(next_state[0]).to(device)
                     state_env = torch.DoubleTensor(next_state[1]).to(device)
@@ -390,7 +399,7 @@ def recurrent_A2C(
                         curr_info.append(info)
                         
                         
-
+                
                 state = next_state
 
                 # now we store the values
@@ -404,6 +413,7 @@ def recurrent_A2C(
 
                 # storing the reward retrived from the enbv
                 reward = float(reward)
+                
                 episode_rewards.append(reward)
                 reward = np.expand_dims(reward, axis=0)
                 reward = np.expand_dims(reward, axis=0)
@@ -437,7 +447,7 @@ def recurrent_A2C(
             advantage_cat = torch.cat((advantage_cat, advantage), 0)
 
             torch.cuda.empty_cache()
-
+        
         # EPISODIO FINITO
         episode_idx += 1
         all_mean_rewards.append(np.sum(np.array(episode_rewards)))
@@ -455,7 +465,9 @@ def recurrent_A2C(
                 ([curr_traj_t], [curr_info_t]),
                 automa_implementation="logic_circuit",
             )
+            
             sequence_accuracy.append(acc)
+            #print(sequence_accuracy)
             with open(
                 path + "/sequence_classification_accuracy_" + str(experiment) + ".txt",
                 "a",
@@ -556,6 +568,7 @@ def recurrent_A2C(
         if len(all_mean_rewards) >= 100 and all_mean_rewards_averaged[-1] == 100:
             episode_idx = max_episodes
 
+        #exit()
     # save the cnn state dict in case of feature extraction
     if feature_extraction:
         torch.save(

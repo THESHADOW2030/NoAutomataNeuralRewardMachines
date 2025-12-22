@@ -22,8 +22,8 @@ class GridWorldEnv_multitask(gym.Env):
     }
 
     symbol_to_name = {
-        'a': 'pick', 'b': 'lava', 'c': 'door', 'd': 'gem', 'e': 'egg', 'f': 'sword',
-        'g': 'bow', 'h': 'arrow', 'i': 'potion', 'j': 'book', 'k': 'food', 'l': 'gold',
+        'c0': 'pick', 'c1': 'lava', 'c2': 'door', 'c3': 'gem', 'c4': 'egg', 'c5': 'sword',
+        'c6': 'bow', 'c7': 'arrow', 'c8': 'potion', 'c9': 'book', 'c10': 'food', 'c11': 'gold',
         '': 'nothing'
     }
 
@@ -33,12 +33,22 @@ class GridWorldEnv_multitask(gym.Env):
     
 
     def __init__(self, render_mode="human", state_type="image", obs_size=(56,56), win_size=(896,896), map_size=7,
-        max_num_steps=75, randomize_loc=False, randomize_start=True, img_dir="imgs_16x16", save_obs=False,
-        symbols=['a', 'b', 'c', 'd', 'e'], wrap_around_map=True, agent_centric_view=True):
-        
+        max_num_steps=50, randomize_loc=False, randomize_start=True, img_dir="imgs_16x16", save_obs=True,
+        symbols=['c0', 'c1', 'c2', 'c3', 'c4'], wrap_around_map=True, agent_centric_view=True):
+
         self.dictionary_symbols = symbols + ['']
         self.num_symbols = len(self.dictionary_symbols)
+
+        print(max_num_steps)
+        
+        
+        print("symbols:", self.dictionary_symbols)
+        
+        GridWorldEnv_multitask.symbol_to_index = { symbol: idx for idx, symbol in enumerate(self.dictionary_symbols) }
+        
         self.dictionary_icons = [self.symbol_to_name[symbol] for symbol in self.dictionary_symbols[:-1]]
+        
+        
 
         self.randomize_locations = randomize_loc
         self.randomize_start = randomize_start
@@ -145,7 +155,8 @@ class GridWorldEnv_multitask(gym.Env):
         if self.randomize_locations:
 
             # select random locations for items
-            num_items = (self.num_symbols-1)*2
+            #num_items = (self.num_symbols-1)*2
+            num_items = self.num_symbols - 1
             sampled_locations = random.sample(self.all_locations, num_items)
 
             # assign item locations
@@ -172,16 +183,16 @@ class GridWorldEnv_multitask(gym.Env):
 
         
 
-        #save as an image the observation
-        image = (np.transpose(observation) * 255).astype(np.uint8)
-        image_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        # #save as an image the observation
+        # image = (np.transpose(observation) * 255).astype(np.uint8)
+        # image_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
-        #save it in ./
-        obs_folder = os.path.join(REPO_DIR, 'saves/env_obs')
-        if not os.path.exists(obs_folder):
-            os.makedirs(obs_folder)
-        obs_path = os.path.join(obs_folder, f'obs_reset_{self.num_episodes}.png')
-        cv2.imwrite(obs_path, image_bgr)
+        # #save it in ./
+        # obs_folder = os.path.join(REPO_DIR, 'saves/env_obs')
+        # if not os.path.exists(obs_folder):
+        #     os.makedirs(obs_folder)
+        # obs_path = os.path.join(obs_folder, f'obs_reset_{self.num_episodes}.png')
+        # cv2.imwrite(obs_path, image_bgr)
         #print(f"Saved observation image at {obs_path}")
         
 
@@ -205,9 +216,37 @@ class GridWorldEnv_multitask(gym.Env):
 
         # compute values to return
         observation = self.loc_to_obs[self.agent_location].copy()
+
+        
         reward = 0.0
         done = self.curr_step >= self.max_num_steps
         info = None
+
+        # #DEBUG: save the observation as an image and exit
+        # debug_folder = os.path.join(os.getcwd(), 'Debug')
+        # print("Debug folder:", debug_folder)
+
+        # if not os.path.exists(debug_folder):
+        #     os.makedirs(debug_folder)
+
+        # print(observation)
+        # exit()
+
+
+        # image = (np.transpose(observation *  (self.stdev + 1e-10) + self.mean, (1, 2, 0)) * 255).astype(np.uint8)
+        # image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+
+        
+        # obs_path = os.path.join(debug_folder, f'obs_step_{self.num_episodes}_{self.curr_step}.png')
+        # cv2.imwrite(obs_path, image)
+        # print(f"Saved observation image at {obs_path}")
+
+        # print(image)
+
+
+        
+        
+        
 
         return observation, reward, done, info
 
@@ -234,7 +273,7 @@ class GridWorldEnv_multitask(gym.Env):
 
 
     def _precompute_observations(self, save_obs=False):
-
+        save_obs = False
         # precompute symbols per location
         self.loc_to_label = {loc: self.num_symbols-1 for loc in self.all_locations}
         for label, icon in enumerate(self.dictionary_icons):
@@ -258,14 +297,24 @@ class GridWorldEnv_multitask(gym.Env):
                     image = (np.transpose(self.loc_to_obs[r,c], (1, 2, 0)) * 255).astype(np.uint8)
                     image_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
                     obs_path = os.path.join(obs_folder, f'obs_{r}_{c}.png')
+                    
                     cv2.imwrite(obs_path, image_bgr)
 
             # normalize observations
             mean = np.mean(self.loc_to_obs[self.initial_agent_location])
             stdev = np.std(self.loc_to_obs[self.initial_agent_location])
+
+            self.mean = mean
+            self.stdev = stdev
+
             for loc in self.all_locations:
                 norm_img = (self.loc_to_obs[loc] - mean) / (stdev + 1e-10)
                 self.loc_to_obs[loc] = norm_img
+                if save_obs:
+                    image = (np.transpose(norm_img, (1, 2, 0)) * 255).astype(np.uint8)
+                    image_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+                    obs_path = os.path.join(obs_folder, f'obs_norm_{loc[0]}_{loc[1]}.png')
+                    cv2.imwrite(obs_path, image_bgr)
 
         elif self.state_type == "symbol":
 
@@ -562,7 +611,9 @@ class GridWorldEnv_12_Base(GridWorldEnv_LTL2Action):
             state_type = state_type,
             grounder = grounder,
             obs_size = obs_size,
-            symbols = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l'],
+            #symbols = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l'],
+            symbols = ["c0", "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10", "c11"],
+            #symbols = ['c0', 'c1', 'c2', 'c3'],
             randomize_loc = True,
             wrap_around_map = True,
             agent_centric_view = False
