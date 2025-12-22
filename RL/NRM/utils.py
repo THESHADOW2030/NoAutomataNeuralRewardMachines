@@ -121,25 +121,33 @@ def eval_acceptance(classifier, automa, alphabet, dataset, automa_implementation
     with torch.no_grad():
         for i in range(len(dataset[0])):
             image_sequences = dataset[0][i].to(device)
-            
             labels = dataset[1][i].to(device)
             batch_size = image_sequences.size()[0]
-
             length_seq = image_sequences.size()[1]
-
             num_channels = image_sequences.size()[2]
 
+            # 1. Get Logits from Classifier
             if len(image_sequences.size()) > 3:
                 pixels_v = image_sequences.size()[3]
                 pixels_h = image_sequences.size()[4]
-                symbols = classifier(image_sequences.view(-1, num_channels, pixels_v, pixels_h))
+                logits = classifier(image_sequences.view(-1, num_channels, pixels_v, pixels_h))
             else:
-                symbols = classifier(image_sequences.view(-1, num_channels).double())
-            '''
-            if discretize_labels:
-                symbols[:,0] = torch.where(symbols[:,0] > 0.5, 1., 0.)
-                symbols = sftmx_with_temp(symbols, temp=0.00001)
-            '''
+                logits = classifier(image_sequences.view(-1, num_channels).double())
+
+            # ---------------------------------------------------------
+            # !!! THE FIX: CONVERT LOGITS TO ONE-HOT / PROBABILITIES !!!
+            # ---------------------------------------------------------
+            # The automa cannot handle raw logits (negative numbers).
+            # We take the argmax (the most likely symbol) and make it one-hot.
+            # This mimics the "Hard=True" from your training.
+            
+            predicted_symbol_indices = torch.argmax(logits, dim=-1)
+            
+            # Create One-Hot encoding (Batch*SeqLen, NumSymbols)
+            symbols = torch.zeros_like(logits)
+            symbols.scatter_(1, predicted_symbol_indices.unsqueeze(1), 1.0)
+            # ---------------------------------------------------------
+
             sym_sequences = symbols.view(batch_size, length_seq, numb_of_symbols)
 
             if automa_implementation == 'lstm':

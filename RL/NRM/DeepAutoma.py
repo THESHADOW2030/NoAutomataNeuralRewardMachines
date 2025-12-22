@@ -26,10 +26,14 @@ class ProbabilisticAutoma(nn.Module):
         self.activation = sftmx_with_temp
         #if initialization == "gaussian":
         #standard gaussian noise initialization
-        self.trans_prob = torch.normal(0, 0.5, size=( numb_of_actions, numb_of_states, numb_of_states), requires_grad=True, device=device)
-        self.trans_prob = self.trans_prob.double()
-        self.rew_matrix = torch.normal(0, 0.5, size=( numb_of_states, numb_of_rewards), requires_grad=True, device=device)
-        self.rew_matrix = self.rew_matrix.double()
+        # --- FIX 1: USE nn.Parameter ---
+        # We must wrap the tensors so the Optimizer sees them!
+        self.trans_prob = nn.Parameter(
+            torch.normal(0, 5.0, size=(numb_of_actions, numb_of_states, numb_of_states))
+        )
+        self.rew_matrix = nn.Parameter(
+            torch.normal(0, 5.0, size=(numb_of_states, numb_of_rewards))
+        )
         
         '''
         if initialization == "random_DFA":
@@ -43,58 +47,70 @@ class ProbabilisticAutoma(nn.Module):
         '''
 
     #input: sequence of actions (batch, length_seq, num_of_actions)
-    def forward(self, action_seq, temp, current_state= None):
+    def forward(self, action_seq, temp, current_state=None):
         batch_size = action_seq.size()[0]
         length_size = action_seq.size()[1]
+        
+        # FIX: Get the device from the input so tensors are created on GPU/CPU dynamically
+        device = action_seq.device 
 
-        pred_states = torch.zeros((batch_size, length_size, self.numb_of_states))
-        pred_rew = torch.zeros((batch_size, length_size, self.numb_of_rewards))
+        # FIX: Add device=device argument
+        pred_states = torch.zeros((batch_size, length_size, self.numb_of_states), device=device)
+        pred_rew = torch.zeros((batch_size, length_size, self.numb_of_rewards), device=device)
 
-        if current_state == None:
-            s = torch.zeros((batch_size,self.numb_of_states)).to(device)
-            #initial state is 0 for construction
-            s[:,0] = 1.0
+        if current_state is None:
+            # FIX: Use the captured device variable
+            s = torch.zeros((batch_size, self.numb_of_states), device=device)
+            # initial state is 0 for construction
+            s[:, 0] = 1.0
         else:
             s = current_state
-        #print("current state: ", s[0])
-        for i in range(length_size):
-            a = action_seq[:,i, :]
-            #print("current symbol: ", a[0])
 
+        for i in range(length_size):
+            a = action_seq[:, i, :]
             s, r = self.step(s, a, temp)
-            #print("Reward: ", r[0])
-            #print("current state: ", s[0])
-            s = sftmx(s)
-            pred_states[:,i,:] = s
-            pred_rew[:,i,:] = r
-        #assert False
+            
+            pred_states[:, i, :] = s
+            pred_rew[:, i, :] = r
+            
         return pred_states, pred_rew
 
     def step(self, state, action, temp):
-
+        
+        # --- FIX 2: Decouple Matrices Temp ---
+        # Even if the Symbol Grounder is exploring (High Temp), 
+        # the machine logic should be relatively sharp (Low Temp).
+        # We clamp the matrix temp to max 1.0.
+        matrix_temp = min(temp, 1.0)
         
         
         if type(action) == int:
             action= torch.IntTensor([action])
         #activation
-        temp = 1.0e-3
-        trans_prob = self.activation(self.trans_prob, temp)
         
-        rew_matrix = self.activation(self.rew_matrix, temp)
-        #no activation
-        #trans_prob = self.trans_prob    #
-       #rew_matrix = self.rew_matrix #TODO COMMENTA QUESTA NEL CASO 
+        # 1. Get Probability Matrices
+        # Shape: (Actions, Current_State, Next_State)
+        T = self.activation(self.trans_prob, matrix_temp)
+        # Shape: (Current_State, Rewards)
+        R = self.activation(self.rew_matrix, matrix_temp)
         
-        trans_prob = trans_prob.unsqueeze(0)
-        state = state.unsqueeze(1).unsqueeze(-2)
-
-        selected_prob = torch.matmul(state.double(), trans_prob)
-
-        next_state = torch.matmul(action.unsqueeze(1), selected_prob.squeeze())
-      
-        next_reward = torch.matmul(next_state, rew_matrix)
-       
-        return next_state.squeeze(1), next_reward.squeeze(1)
+        # 2. Calculate Transition (The "Logic" Step)
+        # We use Einstein Summation for clarity and safety.
+        # b=batch, a=action, s=current_state, k=next_state
+        
+        # Logic: 
+        # We want to find the distribution of the NEXT state (k).
+        # We take the current state (s) AND the action taken (a).
+        # We look up the transition tensor T[a, s, k].
+        
+        # Formula: Sum over 'a' and 's'
+        next_state = torch.einsum('bs, ba, ask -> bk', state, action, T)
+        
+        # 3. Calculate Reward
+        # Logic: Based on the state we just landed in (next_state), what is the reward?
+        next_reward = torch.matmul(next_state, R)
+        
+        return next_state, next_reward
 
     def step_(self, state, action, temp):
 

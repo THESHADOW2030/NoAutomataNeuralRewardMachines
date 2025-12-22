@@ -29,7 +29,8 @@ class CNN_grounder(nn.Module):
         x = F.relu(self.fc1(x))
         x = F.dropout(x, training=self.training)
         x = self.fc2(x)
-        x = sftmx_with_temp(x, temp)
+
+       #x = sftmx_with_temp(x, temp)
         return x
 
 class Linear_grounder_no_droput(nn.Module):
@@ -58,4 +59,5 @@ class Linear_grounder(nn.Module):
         )
     def forward(self, x, temp = 1):
         x = self.grounder(x)
-        return sftmx_with_temp(x, temp)
+        return x
+        #return sftmx_with_temp(x, temp)

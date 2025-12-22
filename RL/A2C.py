@@ -46,11 +46,32 @@ lr = 0.0004
 # we train the policy every num_steps
 num_steps = 5
 TT_policy = 5
-TT_grounder = 10
+TT_grounder = 100
 grounder_epochs = 100
 
 # we plot the graph every TTT episode
 TTT = 10
+
+# --- OPTIMIZED HYPERPARAMS ---
+
+# 1. Update Policy frequently to fix the Critic quickly
+TT_policy = 1  # Was 5. Update every episode.
+
+# 2. Train Grounder frequently so the Agent adapts to changes
+TT_grounder = 10 # Was 50. Don't let the agent run blind for too long.
+
+# 3. Prevent Overfitting in the Grounder
+grounder_epochs = 15 # Was 100. Short bursts of learning are better.
+
+# 4. A2C Params (Standard)
+lr = 0.0007       # Slightly higher because batch size is effectively smaller now
+num_steps = 5     # Keep this (standard n-step return)
+hidden_size = 120 # Keep this
+
+# 5. Data Collection
+# Ensure your buffer logic doesn't crash if you don't have 64 samples yet
+# You might want to lower this to 32 if episodes are successful rarely
+target_batch_grounder = 128
 
 
 # Compute the returns (of the rewards) for one episode
@@ -518,13 +539,13 @@ def recurrent_A2C(
 
             if episode_idx % TT_grounder == 0:
                 # Balanced sampling from replay buffers
-                target_batch = 40  # number of traces to use for this training burst
+                target_batch = target_batch_grounder  # number of traces to use for this training burst
                 half = target_batch // 2
                 pos_samples = positive_buffer.sample(half)
                 zero_samples = nonpos_buffer.sample(half)
 
                 sampled = pos_samples + zero_samples
-                if len(sampled) >= 40:  # need at least one full batch for grounder
+                if len(sampled) >= target_batch_grounder:  # need at least one full batch for grounder
                     bat_traj = [traj for (traj, labels) in sampled]
                     bat_labels = [labels for (traj, labels) in sampled]
                     grounder.set_dataset(bat_traj, bat_labels)
