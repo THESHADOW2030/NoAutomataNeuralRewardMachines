@@ -147,208 +147,144 @@ class NeuralRewardMachine:
 
 
 
-    # Add 'batch_size' as an argument
     def train_symbol_grounding(self, num_of_epochs, batch_size=16, env = None):
-        
-        # 1. PREPARE DATA LOADER -------------------------------------------
-        # Assuming self.train_img_seq is a list containing ONE huge tensor [Tensor(N, L, C, H, W)]
-        # We extract the tensor using [0]
-        train_data_tensor = self.train_img_seq[0] 
-        train_label_tensor = self.train_acceptance_img[0].type(torch.LongTensor)
-        
-        # Check if data size matches
-        assert train_data_tensor.size(0) == train_label_tensor.size(0), "Data/Label size mismatch!"
-
-        train_dataset = TensorDataset(train_data_tensor, train_label_tensor)
-        
-        # shuffle=True is crucial for breaking local minima
-        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-        # ------------------------------------------------------------------
-        # 1. SETUP ACCUMULATION
-        target_virtual_batch = 256 
-        accumulation_steps = target_virtual_batch // batch_size # e.g., 64 // 16 = 4 steps
-        
-        
-        self.deepAutoma.to(device)
-        self.classifier.to(device)
-        
-        # Using the corrected parameters list
-        params = list(self.classifier.parameters()) + list(self.deepAutoma.parameters())
-        optimizer = torch.optim.Adam(params, lr=0.0001)
-
-        # Use the gentler Scheduler we discussed
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode='min', factor=0.5, patience=20, min_lr=1e-05, verbose=True
-        )
-
-        print(f"_____________TRAINING START_____________")
-        print(f"Samples: {len(train_dataset)} | Batch Size: {batch_size} | Batches/Epoch: {len(train_loader)}")
-
-        max_accuracy = 0
-        best_classifier = self.classifier
-        
-        # Annealing setup
-        current_temp = 1.0      
-        temp_min = 0.01          
-        anneal_rate = 0.98      
-        self.temperature = current_temp
-
-        # Initialize these variables before the loop
-        best_test_acc = 0.0
-        patience = 10  # Wait 10 epochs before giving up
-        patience_counter = 0
-
-        for epoch in range(num_of_epochs):
-            epoch_losses = []
-            optimizer.zero_grad()
-            # 2. MINI-BATCH LOOP -------------------------------------------
-            for batch_idx, (batch_imgs, batch_lbls) in enumerate(train_loader):
-                
-                # Move batch to device
-                batch_imgs = batch_imgs.to(device)
-                batch_lbls = batch_lbls.to(device)
-
-                # Dimensions
-                curr_batch_size = batch_imgs.size(0)
-                length_seq = batch_imgs.size(1)
-
-                
-
-                # --- A. Forward Pass (Classifier) ---
-                # Reshape: (Batch * Seq_Len, Channels, H, W)
-                if self.dataset == 'minecraft_image':
-                    # Note: No explicit temperature needed here if model outputs logits
-                    flat_imgs = batch_imgs.view(-1, self.num_channels, self.pixels_v, self.pixels_h)
-                    logits = self.classifier(flat_imgs) 
-                else:
-                    logits = self.classifier(batch_imgs)
-
-                # --- B. Gumbel Softmax ---
-                # We apply Gumbel on the LOGITS
-                sym_sequences = F.gumbel_softmax(logits, tau=self.temperature, hard=True, dim=-1)
-                sym_sequences = sym_sequences.view(curr_batch_size, length_seq, self.numb_of_symbols)
-
-                # --- C. Forward Pass (Automa) ---
-                pred_states, pred_rew = self.deepAutoma(sym_sequences, self.temperature)
-
-                # --- D. Loss Calculation ---
-                # --- D. Loss Calculation ---
-                pred_rew = pred_rew.view(-1, self.numb_of_rewards)
-                target_rew = batch_lbls.view(-1)
-
-                
-                # 1. Main Reward Loss (Weighted as discussed before)
-                weights = torch.ones(self.numb_of_rewards).to(device)
-                weights[1:] = 5.0 # Penalize missing the rewards
-                rew_loss = F.nll_loss(torch.log(pred_rew + 1e-9), target_rew)
-
-                
-               
-
-                # 2. BATCH ENTROPY (The Fix for Mode Collapse)
-                # Calculate the average usage of each symbol across the batch
-                # probs shape: (Batch * Seq_Len, Num_Symbols)
-                probs = F.softmax(logits / self.temperature, dim=-1)
-                probs = probs.view(-1, self.numb_of_symbols)
-                
-                # avg_probs: What % of the time did we pick Symbol 0, Symbol 1, etc?
-                avg_probs = torch.mean(probs, dim=0) 
-                
-                # We want this distribution to be uniform (maximize entropy)
-                # If avg_probs is [1.0, 0.0, 0.0] -> Entropy is 0 (BAD)
-                # If avg_probs is [0.3, 0.3, 0.3] -> Entropy is High (GOOD)
-                batch_entropy = -torch.sum(avg_probs * torch.log(avg_probs + 1e-9))
-                
-                # 3. Total Loss
-                # We SUBTRACT batch_entropy because we want to MAXIMIZE it
-                # We increase the coefficient to 0.1 or 0.5 to force diversity early on
-                entropy_coeff = max(0.0, 0.1 - (0.1 * (epoch / num_of_epochs)))
-    
-    
-                loss = rew_loss - (entropy_coeff * batch_entropy)
-
-                #loss = rew_loss
-
-                loss = loss   # Normalize loss for accumulation
-
-                #print(f"Reward Loss: {rew_loss.item():.4f} | Batch Entropy: {batch_entropy.item():.4f} | Total Loss: {loss.item():.4f}")
-
-                loss.backward()
-                torch.nn.utils.clip_grad_norm_(params, max_norm=0.5)
-                    
-                optimizer.step()
-                optimizer.zero_grad() # Reset for next accumulation
-            epoch_losses.append(loss.item())
-            # --------------------------------------------------------------
-
-            # 3. END OF EPOCH UPDATES --------------------------------------
-            mean_loss_new = mean(epoch_losses)
-            scheduler.step(mean_loss_new)
             
-            # Anneal Temperature INSIDE the epoch loop
-            # INSIDE the loop (at the end)
-            if epoch < (num_of_epochs / 2):
-                # Keep it hot!
-                self.temperature = 1.0
-            else:
-                # Start cooling only in the second half
-                self.temperature = max(0.05, self.temperature * anneal_rate)
+            # 1. PREPARE DATA LOADER
+            train_data_tensor = self.train_img_seq[0] 
+            train_label_tensor = self.train_acceptance_img[0].type(torch.LongTensor)
+            train_dataset = TensorDataset(train_data_tensor, train_label_tensor)
+            
+            # USE FULL BATCH (Stabilizes Gradients)
+            full_batch_size = len(train_dataset)
+            train_loader = DataLoader(train_dataset, batch_size=full_batch_size, shuffle=True)
+            
+            print(f"_____________TRAINING START_____________")
+            print(f"Samples: {len(train_dataset)} | Actual Batch Size: {full_batch_size} (Full Batch)")
 
-            # Evaluation (Do this less frequently to save time, e.g., every 5 epochs)
-            if epoch % 5 == 0:
-                train_acc, _, _, test_acc = self.eval_all(automa_implementation='logic_circuit', temperature=1, discretize_labels=True)
-                print(f"Epoch {epoch} | Loss: {mean_loss_new:.4f} | Temp: {self.temperature:.4f} | Train Acc: {train_acc:.2f} | Test Acc: {test_acc:.2f}")
+            self.deepAutoma.to(device)
+            self.classifier.to(device)
+            
+            params = list(self.classifier.parameters()) + list(self.deepAutoma.parameters())
+            optimizer = torch.optim.Adam(params, lr=0.0001)
+
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer, mode='min', factor=0.5, patience=20, min_lr=1e-05, verbose=True
+            )
+
+            max_accuracy = 0
+            best_classifier = self.classifier
+            
+            # Annealing setup
+            self.temperature = 1.0      
+            best_test_acc = 0.0
+            patience = 10
+            patience_counter = 0
+
+            for epoch in range(num_of_epochs):
+                epoch_losses = []
+                optimizer.zero_grad()
                 
-
-
-                if train_acc >= max_accuracy:
-                    max_accuracy = train_acc
-                    best_classifier = self.classifier # Be careful, this is a reference, not a deep copy!
-
-                # --- EARLY STOPPING LOGIC ---
-                if test_acc > best_test_acc:
-                    best_test_acc = test_acc
-                    best_classifier = self.classifier # Save best model
-                    patience_counter = 0 # Reset counter
-                else:
-                    patience_counter += 1
+                # 2. MINI-BATCH LOOP (Actually Full Batch)
+                for batch_idx, (batch_imgs, batch_lbls) in enumerate(train_loader):
                     
-                if patience_counter >= patience:
-                    print(f"Stopping Early: Accuracy hasn't improved for {patience * 5} epochs.")
-                    break
+                    # Move to device
+                    batch_imgs = batch_imgs.to(device)
+                    batch_lbls = batch_lbls.to(device)
+
+                    # --- CRITICAL FIX: DEFINE TARGETS FIRST ---
+                    # We need these for the Masking Logic immediately
+                    target_rew = batch_lbls.view(-1)
+                    
+                    curr_batch_size = batch_imgs.size(0)
+                    length_seq = batch_imgs.size(1)
+
+                    # --- A. Forward Pass (Classifier) ---
+                    if self.dataset == 'minecraft_image':
+                        flat_imgs = batch_imgs.view(-1, self.num_channels, self.pixels_v, self.pixels_h)
+                        logits = self.classifier(flat_imgs) 
+                    else:
+                        logits = self.classifier(batch_imgs)
+
+                    # --- B. DEADLOCK BREAKER: LOGIT MASKING ---
+                    # 1. Identify the "Background Symbol" using Empty samples (Reward 0)
+                    zero_rew_mask = (target_rew == 0)
+                    
+                    if zero_rew_mask.any():
+                        with torch.no_grad():
+                            zero_logits = logits[zero_rew_mask]
+                            # Find which symbol has the highest avg probability on empty images
+                            zero_probs = F.softmax(zero_logits, dim=-1).mean(dim=0)
+                            background_symbol_idx = torch.argmax(zero_probs)
+                    else:
+                        background_symbol_idx = 0 # Default fallback
+
+                    # 2. Mask this symbol for "Gem" images (Positive Rewards)
+                    masked_logits = logits.clone()
+                    pos_rew_mask = (target_rew > 0) # Identifies Gems/Lava
+
+                    if pos_rew_mask.any():
+                        # Set the Background Symbol logit to -infinity for Gems.
+                        # This FORCES the model to pick a new symbol (breaking the deadlock).
+                        masked_logits[pos_rew_mask, background_symbol_idx] = -1e9
+
+                    # --- C. Gumbel Softmax (Use Masked Logits!) ---
+                    sym_sequences = F.gumbel_softmax(masked_logits, tau=self.temperature, hard=True, dim=-1)
+                    sym_sequences = sym_sequences.view(curr_batch_size, length_seq, self.numb_of_symbols)
+
+                    # --- D. Forward Pass (Automa) ---
+                    pred_states, pred_rew = self.deepAutoma(sym_sequences, self.temperature)
+                    pred_rew = pred_rew.view(-1, self.numb_of_rewards)
+
+                    # --- E. Loss Calculation ---
+                    
+                    # 1. Weighted Reward Loss (The "Scream" Factor)
+                    # Ensure weights are on device!
+                    weights = torch.tensor([1.0, 50.0, 50.0]).to(device) 
+                    rew_loss = F.nll_loss(torch.log(pred_rew + 1e-9), target_rew, weight=weights)
+
+                    # 2. NO HINGE LOSS
+                    # We rely purely on Masking + Weights to separate classes.
+                    loss = rew_loss
+
+                    loss.backward()
+                    torch.nn.utils.clip_grad_norm_(params, max_norm=0.5)
+                        
+                    optimizer.step()
+                    optimizer.zero_grad() 
+                    
+                epoch_losses.append(loss.item())
+
+                # --- F. End of Epoch Updates ---
+                mean_loss_new = mean(epoch_losses)
+                scheduler.step(mean_loss_new)
                 
-           
-            mean_loss = mean_loss_new
-            scheduler.step(mean_loss)
-            self.eval_symbol_grounding(env = env)
-        #write the accuracies of the last epoch
+                # Fast Annealing
+                if epoch > 0:
+                    self.temperature = max(0.1, self.temperature * 0.95)
 
-        self.classifier = best_classifier    
+                if epoch % 5 == 0:
+                    train_acc, _, _, test_acc = self.eval_all(automa_implementation='logic_circuit', temperature=1, discretize_labels=True)
+                    print(f"Epoch {epoch} | Loss: {mean_loss_new:.4f} | Temp: {self.temperature:.4f} | Train Acc: {train_acc:.2f} | Test Acc: {test_acc:.2f}")
 
+                    if train_acc >= max_accuracy:
+                        max_accuracy = train_acc
+                        best_classifier = self.classifier 
 
-        
+                    if test_acc > best_test_acc:
+                        best_test_acc = test_acc
+                        best_classifier = self.classifier 
+                        patience_counter = 0 
+                    else:
+                        patience_counter += 1
+                        
+                    if patience_counter >= patience:
+                        print(f"Stopping Early: Accuracy hasn't improved for {patience * 5} epochs.")
+                        break
+                    
+                self.eval_symbol_grounding(env = env)
 
-
-
-        #TODO: classificare i simboli per debugging 
-
-
-        
-        # os.makedirs(self.log_dir + "/DeepAutoma/", exist_ok=True)  # Create it if it doesn't exist
-
-        # # Now save the pickle
-        # with open(f"{self.log_dir + '/DeepAutoma'}/exp{self.exp_num}.pkl", 'wb') as outp:
-        #     print(f"Saving the automa in {self.log_dir + 'DeepAutoma'}exp{self.exp_num}.pkl")
-        #     pickle.dump(self.deepAutoma, outp, pickle.HIGHEST_PROTOCOL)
-
-        
-
-
-        # dfa = self.deepAutoma.net2dfa(self.temperature, name_automata= self.log_dir + "/exp"+str(self.exp_num)+"_grounder")
-        
-
-
-        
+            self.classifier = best_classifier
+            
 
 
     def train_DFA(self, batch_size, num_of_epochs, decay=0.999, freezed=False):

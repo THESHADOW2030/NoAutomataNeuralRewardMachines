@@ -73,6 +73,20 @@ hidden_size = 120 # Keep this
 # You might want to lower this to 32 if episodes are successful rarely
 target_batch_grounder = 128
 
+
+
+
+#-------------------GEMINI-------------------#
+TT_grounder = 50
+grounder_epochs = 50
+max_episodes = 10000
+
+
+
+
+
+
+
 import os
 def plot_smoothed_sequence_classification_accuracy():
 #read sequence_classification_accuracy_0.txt
@@ -291,8 +305,8 @@ def recurrent_A2C(
                 idxs = np.random.choice(len(self.data), size=min(n, len(self.data)), replace=False)
                 return [self.data[i] for i in idxs]
 
-        positive_buffer = TraceReplayBuffer(capacity=3000)
-        nonpos_buffer = TraceReplayBuffer(capacity=3000)
+        positive_buffer = TraceReplayBuffer(capacity=10000)
+        nonpos_buffer = TraceReplayBuffer(capacity=10000)
         # derive label ids for +1, 0, -1 rewards from env mapping if available
         
         pos_label = None
@@ -584,32 +598,31 @@ def recurrent_A2C(
                 f"Episode {episode_idx}, TT_policy {TT_policy}, TT_grounder {TT_grounder}, sequence accuracy (last) {sequence_accuracy[-1]}, image accuracy (last) {image_accuracy[-1]}"
             )
 
+            # ... inside the episode loop ...
             if episode_idx % TT_grounder == 0:
                 target_batch = target_batch_grounder # 128
                 half = target_batch // 2
                 
-                pos_samples = positive_buffer.sample(half)
-                zero_samples = nonpos_buffer.sample(half)
-
-                sampled = pos_samples + zero_samples
-                
-                # FIX: Allow training if we have at least 'half' the desired batch
-                # This ensures we don't stall if we only have 50 positive traces.
-                min_required = 64 
-
-                if len(sampled) >= min_required: 
-                    bat_traj = [traj for (traj, labels) in sampled]
-                    bat_labels = [labels for (traj, labels) in sampled]
-                    
-                    # Reset Temp!
-                    grounder.temperature = 1.0 
-                    
-                    grounder.set_dataset(bat_traj, bat_labels)
-                    # Pass the small batch size (16) to the function
-                    grounder.train_symbol_grounding(grounder_epochs, batch_size=16, env=env)
-                
+                # CRITICAL FIX 1: Check if we actually have positive samples
+                if len(positive_buffer) < 5: 
+                    print(f"Skipping Grounder Training: Not enough positive traces yet ({len(positive_buffer)})")
                 else:
-                    print(f"Skipping Grounder: Not enough data ({len(sampled)}/{min_required})")
+                    # We have data!
+                    pos_samples = positive_buffer.sample(half)
+                    # Fill the rest with negative samples
+                    remaining_slots = target_batch - len(pos_samples)
+                    zero_samples = nonpos_buffer.sample(remaining_slots)
+                    
+                    sampled = pos_samples + zero_samples
+                    
+                    # CRITICAL FIX 2: Ensure we have a healthy mix
+                    if len(sampled) >= 64: 
+                        bat_traj = [traj for (traj, labels) in sampled]
+                        bat_labels = [labels for (traj, labels) in sampled]
+                        
+                        grounder.temperature = 1.0 
+                        grounder.set_dataset(bat_traj, bat_labels)
+                        grounder.train_symbol_grounding(grounder_epochs, batch_size=16, env=env)
                 
 
                 image_traj = []
