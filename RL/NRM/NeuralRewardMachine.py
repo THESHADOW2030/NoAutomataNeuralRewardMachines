@@ -239,18 +239,50 @@ class NeuralRewardMachine:
                     
                     # 1. Weighted Reward Loss (The "Scream" Factor)
                     # Ensure weights are on device!
+                    # --- E. Loss Calculation ---
+                    
+                    # 1. Weighted Reward Loss (The "Scream" Factor)
                     weights = torch.tensor([1.0, 50.0, 50.0]).to(device) 
                     rew_loss = F.nll_loss(torch.log(pred_rew + 1e-9), target_rew, weight=weights)
 
-                    # 2. NO HINGE LOSS
-                    # We rely purely on Masking + Weights to separate classes.
-                    loss = rew_loss
+                    # --- PI INTERVENTION: ANTI-COLLAPSE REGULARIZATION ---
+                    
+                    # Get soft probabilities for entropy calculation
+                    # (Use the unmasked logits to encourage the base network to learn diversity)
+                    probs = F.softmax(logits, dim=-1)
+                    
+                    # 2. Per-Sample Entropy (Encourage Uncertainty/Exploration)
+                    # If the model is 100% sure of Symbol 2, this is 0. We want it > 0 initially.
+                    entropy = -torch.sum(probs * torch.log(probs + 1e-9), dim=-1).mean()
+                    
+                    # 3. Batch Diversity Loss (The "Nuclear Option" for Collapse)
+                    # Calculate the average probability distribution across the ENTIRE batch.
+                    # If the batch is [2, 2, 2, 2], avg_prob is [0, 0, 1, 0].
+                    # We want avg_prob to look like [0.2, 0.2, 0.2, 0.2, 0.2].
+                    avg_probs = torch.mean(probs, dim=0)
+                    batch_entropy = -torch.sum(avg_probs * torch.log(avg_probs + 1e-9))
+                    
+                    # We want to MAXIMIZE batch_entropy (make the batch diverse).
+                    # Since we minimize loss, we subtract it.
+                    
+                    # Hyperparameters for stability
+                    lambda_entropy = 0.05   # Scale for individual exploration
+                    lambda_diversity = 0.5  # Scale for forcing different symbols in a batch
+                    
+                    # Anneal these? Ideally yes, but for now, let's just force the learning.
+                    #if self.exp_num > 0: # Reduce regularization later if needed
+                     #   pass 
+
+                    # TOTAL LOSS
+                    loss = rew_loss - (lambda_entropy * entropy) - (lambda_diversity * batch_entropy)
+                    
+                    # -----------------------------------------------------
 
                     loss.backward()
                     torch.nn.utils.clip_grad_norm_(params, max_norm=0.5)
                         
                     optimizer.step()
-                    optimizer.zero_grad() 
+                    optimizer.zero_grad()
                     
                 epoch_losses.append(loss.item())
 

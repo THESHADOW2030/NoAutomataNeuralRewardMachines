@@ -45,7 +45,7 @@ class CNN_grounder_old(nn.Module):
         return x
     
 
-    
+
     
 class CNN_grounder(nn.Module):
     def __init__(self, num_symbols):
@@ -68,8 +68,9 @@ class CNN_grounder(nn.Module):
         # 64x64 -> 32x32 -> 16x16 -> 8x8 spatial size
         self.flat_size = 64 * 8 * 8 
         
-        self.fc1 = nn.Linear(self.flat_size, 128)
-        self.fc2 = nn.Linear(128, num_symbols)
+        self.fc1 = nn.Linear(self.flat_size, 512)
+
+        self.fc2 = nn.Linear(512, num_symbols)
 
     def forward(self, x):
         # Apply Conv -> BN -> ReLU -> Pool
