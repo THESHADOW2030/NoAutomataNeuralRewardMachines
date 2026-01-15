@@ -199,7 +199,7 @@ class MooreMachine(DFA):
                 if r != -100:
                     self.rewards[i] = (r - minimum)
 
-            maximum = max(self.rewards )
+            maximum = max(self.rewards)
             #max : 100 = rew : x
             #x = 100 * rew / max
             for i,r in enumerate(self.rewards):

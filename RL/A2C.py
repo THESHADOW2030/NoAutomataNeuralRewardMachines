@@ -61,7 +61,7 @@ TT_policy = 1  # Was 5. Update every episode.
 TT_grounder = 10 # Was 50. Don't let the agent run blind for too long.
 
 # 3. Prevent Overfitting in the Grounder
-grounder_epochs = 15 # Was 100. Short bursts of learning are better.
+grounder_epochs = 150 # Was 100. Short bursts of learning are better.
 
 # 4. A2C Params (Standard)
 lr = 0.0007       # Slightly higher because batch size is effectively smaller now
@@ -73,7 +73,44 @@ hidden_size = 120 # Keep this
 # You might want to lower this to 32 if episodes are successful rarely
 target_batch_grounder = 128
 
+import os
+def plot_smoothed_sequence_classification_accuracy():
+#read sequence_classification_accuracy_0.txt
+    for i in range(5):
+    #check if file exists
+        if not os.path.exists(os.path.join(os.path.dirname(__file__), f'sequence_classification_accuracy_{i}.txt')):
+            continue 
+        with open(os.path.join(os.path.dirname(__file__), f'sequence_classification_accuracy_{i}.txt'), 'r') as f:
+            lines = f.readlines()
 
+        lines = [line.strip() for line in lines if line.strip()]
+        lines = list(map(float, lines))
+        smoothed = []
+        mean = 0
+        for i, line in enumerate(lines):
+            if i % 100 == 0:
+                smoothed.append((i, mean / 100))
+                mean = 0
+            mean += line
+            if i == len(lines) - 1:
+                smoothed.append((i, mean / (i % 100 + 1)))  # handle last segment
+        lines = smoothed
+
+        #plot the smoothed values
+        import matplotlib.pyplot as plt
+        plt.plot(*zip(*lines))
+        plt.xlabel('Training Steps (x100)')
+        plt.ylabel('Sequence Classification Accuracy')
+        plt.title('Smoothed Sequence Classification Accuracy over Training Steps')
+        plt.grid()
+        plt.savefig(os.path.join(os.path.dirname(__file__), f'sequence_classification_accuracy_smoothed_{i}.png'))
+        plt.close()
+
+
+
+
+
+        print(list(lines))
 # Compute the returns (of the rewards) for one episode
 def compute_returns(next_value, rewards, masks, gamma=0.99):
     R = next_value
@@ -176,6 +213,7 @@ def recurrent_A2C(
         CNN_output_size = 16
         num_inputs = CNN_output_size
         params += list(cnn.parameters())
+        
     else:
         num_inputs = env.state_space_size
         #num_inputs = env.observation_space.shape
@@ -301,6 +339,8 @@ def recurrent_A2C(
 
             if feature_extraction:
                 state_env = cnn(state_env.view(-1, 3, 64, 64))
+                
+                
             state = torch.cat((state_env, state_dfa.unsqueeze(0)), 1).squeeze()
         else:
             state = torch.DoubleTensor(obs).to(device)
@@ -319,6 +359,7 @@ def recurrent_A2C(
             if feature_extraction:
                 state = cnn(state.view(-1, 3, 64, 64))
                 state = state.squeeze()
+                
 
         # first step with RNN or dfa
         if method == "rnn":
@@ -486,6 +527,8 @@ def recurrent_A2C(
                 ([curr_traj_t], [curr_info_t]),
                 automa_implementation="logic_circuit",
             )
+
+
             
             sequence_accuracy.append(acc)
             #print(sequence_accuracy)
@@ -497,6 +540,7 @@ def recurrent_A2C(
             if env.state_type == "symbol":
                 acc, _ = grounder.eval_image_classification()
             else:
+                grounder.eval_symbol_grounding(env=env)
                 acc = 0
             image_accuracy.append(acc)
             with open(
@@ -513,8 +557,11 @@ def recurrent_A2C(
             info_traj.append(curr_info)
 
             # Positive buffer if any timestep has label == 1; otherwise (only 0 and/or -1) goes to non-positive buffer
+            #print(f"Current info : {curr_info}")
+            #print(f"Reward : {curr_rew}")
             if any(lbl == pos_label for lbl in curr_info):
                 positive_buffer.add(curr_traj, curr_info)
+
             else:
                 nonpos_buffer.add(curr_traj, curr_info)
 
@@ -538,21 +585,31 @@ def recurrent_A2C(
             )
 
             if episode_idx % TT_grounder == 0:
-                # Balanced sampling from replay buffers
-                target_batch = target_batch_grounder  # number of traces to use for this training burst
+                target_batch = target_batch_grounder # 128
                 half = target_batch // 2
+                
                 pos_samples = positive_buffer.sample(half)
                 zero_samples = nonpos_buffer.sample(half)
 
                 sampled = pos_samples + zero_samples
-                if len(sampled) >= target_batch_grounder:  # need at least one full batch for grounder
+                
+                # FIX: Allow training if we have at least 'half' the desired batch
+                # This ensures we don't stall if we only have 50 positive traces.
+                min_required = 64 
+
+                if len(sampled) >= min_required: 
                     bat_traj = [traj for (traj, labels) in sampled]
                     bat_labels = [labels for (traj, labels) in sampled]
+                    
+                    # Reset Temp!
+                    grounder.temperature = 1.0 
+                    
                     grounder.set_dataset(bat_traj, bat_labels)
-                    grounder.train_symbol_grounding(grounder_epochs)
-
-                # clear episodic collectors, keep buffers for future sampling
+                    # Pass the small batch size (16) to the function
+                    grounder.train_symbol_grounding(grounder_epochs, batch_size=16, env=env)
                 
+                else:
+                    print(f"Skipping Grounder: Not enough data ({len(sampled)}/{min_required})")
                 
 
                 image_traj = []
@@ -573,6 +630,34 @@ def recurrent_A2C(
             plt.savefig(path + "/ImageEnvMeanRewardsReal_" + str(experiment) + ".png")
             plt.clf()
             plt.close()
+
+            #plot the accuracies for nrm
+            if method == "nrm":
+                plt.plot(
+                    [i for i in range(len(sequence_accuracy))], sequence_accuracy
+                )
+                plt.xlabel("episode")
+                plt.ylabel("sequence classification accuracy")
+                plt.savefig(
+                    path + "/SequenceClassificationAccuracy_" + str(experiment) + ".png"
+                )
+                plt.clf()
+                plt.close()
+
+                plt.plot([i for i in range(len(image_accuracy))], image_accuracy)
+                plt.xlabel("episode")
+                plt.ylabel("image classification accuracy")
+                plt.savefig(
+                    path + "/ImageClassificationAccuracy_" + str(experiment) + ".png"
+                )
+                plt.clf()
+                plt.close()
+
+            plot_smoothed_sequence_classification_accuracy()
+
+            
+
+
 
         # else:
         ep_reward = all_mean_rewards[-1]

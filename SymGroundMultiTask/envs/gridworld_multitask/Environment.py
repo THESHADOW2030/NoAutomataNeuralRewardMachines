@@ -33,7 +33,7 @@ class GridWorldEnv_multitask(gym.Env):
     
 
     def __init__(self, render_mode="human", state_type="image", obs_size=(56,56), win_size=(896,896), map_size=7,
-        max_num_steps=50, randomize_loc=False, randomize_start=True, img_dir="imgs_16x16", save_obs=True,
+        max_num_steps=30, randomize_loc=False, randomize_start=True, img_dir="imgs_16x16", save_obs=True,
         symbols=['c0', 'c1', 'c2', 'c3', 'c4'], wrap_around_map=True, agent_centric_view=True):
 
         self.dictionary_symbols = symbols + ['']
@@ -612,8 +612,8 @@ class GridWorldEnv_12_Base(GridWorldEnv_LTL2Action):
             grounder = grounder,
             obs_size = obs_size,
             #symbols = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l'],
-            symbols = ["c0", "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10", "c11"],
-            #symbols = ['c0', 'c1', 'c2', 'c3'],
+            #symbols = ["c0", "c1", "c2", "c3", "c4", "c5", "c6", "c7", "c8", "c9", "c10", "c11"],
+            symbols = ['c0', 'c1', 'c2', 'c3'],
             randomize_loc = True,
             wrap_around_map = True,
             agent_centric_view = False

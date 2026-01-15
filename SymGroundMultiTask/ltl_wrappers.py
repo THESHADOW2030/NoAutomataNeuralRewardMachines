@@ -77,6 +77,7 @@ class LTLEnv(gym.Wrapper):
         self.rew_dictionary = {}
         for idx, reward in enumerate(self.list_rew):
             self.rew_dictionary[reward]=idx
+            
 
         
 
@@ -375,6 +376,8 @@ class LTLGrounderEnv(LTLEnv):
             reward = 0
         else:
             reward = self.automaton.rewards[self.new_automaton_state] - self.automaton.rewards[self.curr_automaton_state]
+            #print("Reward from automaton transition:", reward)
+            #print("From state:", self.curr_automaton_state, "to state:", self.new_automaton_state)
         potential = self.automaton.rewards[self.new_automaton_state]
         self.curr_automaton_state = self.new_automaton_state
 

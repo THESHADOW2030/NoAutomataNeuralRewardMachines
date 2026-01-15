@@ -148,7 +148,7 @@ class NeuralRewardMachine:
 
 
     # Add 'batch_size' as an argument
-    def train_symbol_grounding(self, num_of_epochs, batch_size=16):
+    def train_symbol_grounding(self, num_of_epochs, batch_size=16, env = None):
         
         # 1. PREPARE DATA LOADER -------------------------------------------
         # Assuming self.train_img_seq is a list containing ONE huge tensor [Tensor(N, L, C, H, W)]
@@ -164,13 +164,17 @@ class NeuralRewardMachine:
         # shuffle=True is crucial for breaking local minima
         train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
         # ------------------------------------------------------------------
-
+        # 1. SETUP ACCUMULATION
+        target_virtual_batch = 256 
+        accumulation_steps = target_virtual_batch // batch_size # e.g., 64 // 16 = 4 steps
+        
+        
         self.deepAutoma.to(device)
         self.classifier.to(device)
         
         # Using the corrected parameters list
         params = list(self.classifier.parameters()) + list(self.deepAutoma.parameters())
-        optimizer = torch.optim.Adam(params, lr=0.01)
+        optimizer = torch.optim.Adam(params, lr=0.0001)
 
         # Use the gentler Scheduler we discussed
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -196,7 +200,7 @@ class NeuralRewardMachine:
 
         for epoch in range(num_of_epochs):
             epoch_losses = []
-            
+            optimizer.zero_grad()
             # 2. MINI-BATCH LOOP -------------------------------------------
             for batch_idx, (batch_imgs, batch_lbls) in enumerate(train_loader):
                 
@@ -208,7 +212,7 @@ class NeuralRewardMachine:
                 curr_batch_size = batch_imgs.size(0)
                 length_seq = batch_imgs.size(1)
 
-                optimizer.zero_grad()
+                
 
                 # --- A. Forward Pass (Classifier) ---
                 # Reshape: (Batch * Seq_Len, Channels, H, W)
@@ -231,11 +235,15 @@ class NeuralRewardMachine:
                 # --- D. Loss Calculation ---
                 pred_rew = pred_rew.view(-1, self.numb_of_rewards)
                 target_rew = batch_lbls.view(-1)
+
                 
                 # 1. Main Reward Loss (Weighted as discussed before)
                 weights = torch.ones(self.numb_of_rewards).to(device)
                 weights[1:] = 5.0 # Penalize missing the rewards
-                rew_loss = F.nll_loss(torch.log(pred_rew + 1e-9), target_rew, weight=weights)
+                rew_loss = F.nll_loss(torch.log(pred_rew + 1e-9), target_rew)
+
+                
+               
 
                 # 2. BATCH ENTROPY (The Fix for Mode Collapse)
                 # Calculate the average usage of each symbol across the batch
@@ -254,17 +262,23 @@ class NeuralRewardMachine:
                 # 3. Total Loss
                 # We SUBTRACT batch_entropy because we want to MAXIMIZE it
                 # We increase the coefficient to 0.1 or 0.5 to force diversity early on
-                loss = rew_loss - (0.1 * batch_entropy) 
+                entropy_coeff = max(0.0, 0.1 - (0.1 * (epoch / num_of_epochs)))
+    
+    
+                loss = rew_loss - (entropy_coeff * batch_entropy)
+
+                #loss = rew_loss
+
+                loss = loss   # Normalize loss for accumulation
 
                 #print(f"Reward Loss: {rew_loss.item():.4f} | Batch Entropy: {batch_entropy.item():.4f} | Total Loss: {loss.item():.4f}")
 
                 loss.backward()
-                
-                # OPTIONAL: Gradient Clipping (Helps stability in RNN-like structures)
-                torch.nn.utils.clip_grad_norm_(params, max_norm=1.0)
-                
+                torch.nn.utils.clip_grad_norm_(params, max_norm=0.5)
+                    
                 optimizer.step()
-                epoch_losses.append(loss.item())
+                optimizer.zero_grad() # Reset for next accumulation
+            epoch_losses.append(loss.item())
             # --------------------------------------------------------------
 
             # 3. END OF EPOCH UPDATES --------------------------------------
@@ -284,6 +298,8 @@ class NeuralRewardMachine:
             if epoch % 5 == 0:
                 train_acc, _, _, test_acc = self.eval_all(automa_implementation='logic_circuit', temperature=1, discretize_labels=True)
                 print(f"Epoch {epoch} | Loss: {mean_loss_new:.4f} | Temp: {self.temperature:.4f} | Train Acc: {train_acc:.2f} | Test Acc: {test_acc:.2f}")
+                
+
 
                 if train_acc >= max_accuracy:
                     max_accuracy = train_acc
@@ -304,23 +320,31 @@ class NeuralRewardMachine:
            
             mean_loss = mean_loss_new
             scheduler.step(mean_loss)
+            self.eval_symbol_grounding(env = env)
         #write the accuracies of the last epoch
 
         self.classifier = best_classifier    
 
 
         
-        os.makedirs(self.log_dir + "/DeepAutoma/", exist_ok=True)  # Create it if it doesn't exist
 
-        # Now save the pickle
-        with open(f"{self.log_dir + '/DeepAutoma'}/exp{self.exp_num}.pkl", 'wb') as outp:
-            print(f"Saving the automa in {self.log_dir + 'DeepAutoma'}exp{self.exp_num}.pkl")
-            pickle.dump(self.deepAutoma, outp, pickle.HIGHEST_PROTOCOL)
+
+
+        #TODO: classificare i simboli per debugging 
+
+
+        
+        # os.makedirs(self.log_dir + "/DeepAutoma/", exist_ok=True)  # Create it if it doesn't exist
+
+        # # Now save the pickle
+        # with open(f"{self.log_dir + '/DeepAutoma'}/exp{self.exp_num}.pkl", 'wb') as outp:
+        #     print(f"Saving the automa in {self.log_dir + 'DeepAutoma'}exp{self.exp_num}.pkl")
+        #     pickle.dump(self.deepAutoma, outp, pickle.HIGHEST_PROTOCOL)
 
         
 
 
-        dfa = self.deepAutoma.net2dfa(self.temperature, name_automata= self.log_dir + "/exp"+str(self.exp_num)+"_grounder")
+        # dfa = self.deepAutoma.net2dfa(self.temperature, name_automata= self.log_dir + "/exp"+str(self.exp_num)+"_grounder")
         
 
 
@@ -449,7 +473,40 @@ class NeuralRewardMachine:
 
         return train_accuracy, 0,0, test_accuracy_hard
 
-    def eval_image_classification(self):
+    def eval_image_classification(self, env = None):
         train_acc = eval_image_classification_from_traces(self.custom_trace, self.symbolic_grid, self.classifier, True)
         test_acc = train_acc
+
+                
+
+
+        
         return train_acc, test_acc
+
+    def eval_symbol_grounding(self, env = None):
+        
+
+        #TODO: classificare i simboli per debugging. Usare tutte le osservazione precomputed e il classificatore di Neural Reward Machine
+        
+        
+        traces_to_test = env.env.loc_to_obs
+
+        
+        
+        
+        
+        #use the classifier to classify the symbols
+        with torch.no_grad():
+
+            classifier_output_len = len(self.classifier(torch.randn((1,3,64,64), dtype=torch.double).to(device)).squeeze())
+            predicted = [0 for _ in range(classifier_output_len)]
+            for i in traces_to_test.keys():
+                
+                obs = traces_to_test[i]
+                
+                obs = torch.from_numpy(obs).double().to(device).unsqueeze(0)
+                logits = self.classifier(obs)
+                pred_symbols = torch.argmax(logits, dim=1)
+                for s in pred_symbols:
+                    predicted[s] +=1
+        print("Predicted symbol counts: ", predicted)

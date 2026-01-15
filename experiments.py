@@ -122,8 +122,9 @@ def main(argv):
 
     if not os.path.isdir(FLAGS.LOG_DIR):
         os.makedirs(FLAGS.LOG_DIR)
-    for formula_idx, formula in enumerate(formulas):
-        for experiment in range(FLAGS.NUM_EXPERIMENTS):
+    for experiment in range(FLAGS.NUM_EXPERIMENTS):
+        for formula_idx, formula in enumerate(formulas):
+        
             print(f"Experiment {experiment} on formula {formula[2]}")
             path = FLAGS.LOG_DIR + str(formula[2]) + f"/{FLAGS.METHOD}_{FLAGS.ENV}" + f"/NUM_STATES_{FLAGS.NUM_STATES}_NUM_SYMBOLS_{FLAGS.NUM_SYMBOLS}/"
 

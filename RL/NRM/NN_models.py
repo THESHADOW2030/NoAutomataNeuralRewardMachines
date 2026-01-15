@@ -11,26 +11,37 @@ def sftmx_with_temp(x, temp):
 class CNN_grounder(nn.Module):
     def __init__(self, num_symbols):
         super(CNN_grounder, self).__init__()
+        
+        # Increased channels from 5 -> 32/64 to capture features like 'color', 'shape', 'edges'
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, padding=1) 
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
+        self.conv3 = nn.Conv2d(64, 64, kernel_size=3, padding=1)
 
-        self.conv1 = nn.Conv2d(3, 5, kernel_size=5)
-        self.conv2 = nn.Conv2d(5, 5, kernel_size=5)
-        self.conv2_drop = nn.Dropout2d()
-        self.flat = nn.Flatten()
-        self.fc1 = nn.Linear(125, 50)
-        self.fc2 = nn.Linear(50, num_symbols)
-        self.softmax = nn.Softmax()
+        # Less aggressive pooling to preserve small objects (gems/lava)
+        self.pool = nn.MaxPool2d(2, 2) 
+        self.dropout = nn.Dropout(0.3)
+        
+        # Calculate flatten size: 
+        # 64x64 -> pool -> 32x32 -> pool -> 16x16 -> pool -> 8x8
+        # 64 channels * 8 * 8 = 4096
+        self.fc1 = nn.Linear(64 * 8 * 8, 128)
+        self.fc2 = nn.Linear(128, num_symbols)
 
-    def forward(self, x, temp=1):
-        x = F.relu(F.max_pool2d(self.conv1(x), 3))
-        x = F.relu(F.max_pool2d(self.conv2_drop(self.conv2(x)), 3))
-        # x = F.relu(F.max_pool2d(self.conv2_drop(x), 3))
-        x = self.flat(x)
-
+    def forward(self, x):
+        # Layer 1
+        x = self.pool(F.relu(self.conv1(x))) # 64 -> 32
+        # Layer 2
+        x = self.pool(F.relu(self.conv2(x))) # 32 -> 16
+        # Layer 3
+        x = self.pool(F.relu(self.conv3(x))) # 16 -> 8
+        
+        x = x.view(-1, 64 * 8 * 8) # Flatten
         x = F.relu(self.fc1(x))
-        x = F.dropout(x, training=self.training)
+        x = self.dropout(x)
         x = self.fc2(x)
-
-       #x = sftmx_with_temp(x, temp)
+        
+        # Note: Do NOT apply Softmax here if you use CrossEntropy or Gumbel Softmax later
+        # The Gumbel function expects raw logits.
         return x
 
 class Linear_grounder_no_droput(nn.Module):
