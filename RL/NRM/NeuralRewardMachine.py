@@ -9,7 +9,7 @@ from .NN_models import CNN_grounder, Linear_grounder
 import torch.nn.functional as F
 from statistics import mean
 from sklearn.model_selection import train_test_split
-
+import numpy as np
 from torch.utils.data import TensorDataset, DataLoader
 
 from .utils import eval_acceptance, eval_learnt_DFA_acceptance, eval_image_classification_from_traces
@@ -146,178 +146,308 @@ class NeuralRewardMachine:
 
 
 
+    # def train_symbol_grounding_boh(self, num_of_epochs, batch_size=16, env = None):
+            
+    #         # 1. PREPARE DATA LOADER
+    #         train_data_tensor = self.train_img_seq[0] 
+    #         train_label_tensor = self.train_acceptance_img[0].type(torch.LongTensor)
+    #         train_dataset = TensorDataset(train_data_tensor, train_label_tensor)
+            
+    #         # USE FULL BATCH
+    #         full_batch_size = len(train_dataset)
+    #         train_loader = DataLoader(train_dataset, batch_size=full_batch_size, shuffle=True)
+            
+    #         print(f"_____________TRAINING START_____________")
+    #         print(f"Samples: {len(train_dataset)} | Actual Batch Size: {full_batch_size} (Full Batch)")
+
+    #         self.deepAutoma.to(device)
+    #         self.classifier.to(device)
+            
+            
+            
+    #         params = list(self.classifier.parameters()) + list(self.deepAutoma.parameters())
+    #         optimizer = torch.optim.Adam(params, lr=0.0001)
+
+    #         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+    #             optimizer, mode='min', factor=0.5, patience=20, min_lr=1e-05, verbose=True
+    #         )
+
+    #         max_accuracy = 0
+    #         best_classifier = self.classifier
+            
+    #         # Temperature (Standard annealing is fine now)
+    #         self.temperature = 2.0      
+    #         best_test_acc = 0.0
+    #         patience = 10
+    #         patience_counter = 0
+
+    #         for epoch in range(num_of_epochs):
+    #             epoch_losses = []
+    #             optimizer.zero_grad()
+                
+    #             for batch_idx, (batch_imgs, batch_lbls) in enumerate(train_loader):
+    #                 batch_imgs = batch_imgs.to(device)
+    #                 batch_lbls = batch_lbls.to(device)
+    #                 target_rew = batch_lbls.view(-1)
+                    
+    #                 curr_batch_size = batch_imgs.size(0)
+    #                 length_seq = batch_imgs.size(1)
+
+    #                 # --- A. Forward Pass (Classifier) ---
+    #                 if self.dataset == 'minecraft_image':
+    #                     flat_imgs = batch_imgs.view(-1, self.num_channels, self.pixels_v, self.pixels_h)
+    #                     logits = self.classifier(flat_imgs) 
+    #                 else:
+    #                     logits = self.classifier(batch_imgs)
+
+    #                 # --- PI INTERVENTION: PARTIAL SUPERVISION MASKS ---
+    #                 # We don't need "guessing" masks. We use ground truth masks.
+                    
+    #                 # Mask 1: Empty Images (Reward 0)
+    #                 empty_mask = (target_rew == 0)
+                    
+    #                 # Mask 2: Gem Images (Reward > 0)
+    #                 gem_mask = (target_rew != 0)
+
+    #                 # --- C. Gumbel Softmax ---
+    #                 # We pass raw logits. The supervision below handles the guidance.
+    #                 sym_sequences = F.gumbel_softmax(logits, tau=self.temperature, hard=True, dim=-1)
+    #                 sym_sequences = sym_sequences.view(curr_batch_size, length_seq, self.numb_of_symbols)
+
+    #                 # --- D. Forward Pass (Automa) ---
+    #                 pred_states, pred_rew = self.deepAutoma(sym_sequences, self.temperature)
+    #                 pred_rew = pred_rew.view(-1, self.numb_of_rewards)
+
+    #                 # --- E. LOSS CALCULATION ---
+                    
+    #                 # 1. RL Loss (Standard)
+    #                 weights = torch.tensor([1.0, 50.0, 50.0]).to(device) 
+    #                 rew_loss = F.nll_loss(torch.log(pred_rew + 1e-9), target_rew, weight=weights)
+
+    #                 # 2. Supervised "Empty" Loss
+    #                 # If Reward is 0, the Symbol MUST be 0.
+    #                 # We treat this as a classification problem.
+    #                 if empty_mask.any():
+    #                     empty_logits = logits[empty_mask]
+    #                     empty_targets = torch.zeros(empty_logits.size(0), dtype=torch.long).to(device)
+    #                     supervised_loss = F.cross_entropy(empty_logits, empty_targets)
+    #                 else:
+    #                     supervised_loss = 0.0
+
+    #                 # 3. Separation "Gem" Constraint
+    #                 # If Reward is NOT 0, the Symbol MUST NOT be 0.
+    #                 # We penalize the probability of Symbol 0 for Gems.
+    #                 if gem_mask.any():
+    #                     gem_logits = logits[gem_mask]
+    #                     gem_probs = F.softmax(gem_logits, dim=-1)
+    #                     # We want prob of Sym0 to be 0.
+    #                     # Minimizing (prob_sym0) is equivalent to maximizing log(1 - prob_sym0)
+    #                     sym0_probs = gem_probs[:, 0]
+    #                     separation_loss = -torch.log(1.0 - sym0_probs + 1e-9).mean()
+    #                 else:
+    #                     separation_loss = 0.0
+
+    #                 # TOTAL LOSS
+    #                 # We give high weight (10.0) to supervision because it's Ground Truth.
+    #                 loss = rew_loss + (10.0 * supervised_loss) + (10.0 * separation_loss)
+                    
+    #                 # -----------------------------------------------------
+
+    #                 loss.backward()
+    #                 torch.nn.utils.clip_grad_norm_(params, max_norm=0.5)
+                        
+    #                 optimizer.step()
+    #                 optimizer.zero_grad()
+                    
+    #             epoch_losses.append(loss.item())
+
+    #             # --- F. End of Epoch Updates ---
+    #             mean_loss_new = mean(epoch_losses)
+    #             scheduler.step(mean_loss_new)
+                
+    #             # Standard Annealing
+    #             if epoch > 0:
+    #                  self.temperature = max(0.5, self.temperature * 0.95)
+
+    #             if epoch % 5 == 0:
+    #                 train_acc, _, _, test_acc = self.eval_all(automa_implementation='logic_circuit', temperature=1, discretize_labels=True)
+    #                 print(f"Epoch {epoch} | Loss: {mean_loss_new:.4f} | Temp: {self.temperature:.4f} | Train Acc: {train_acc:.2f} | Test Acc: {test_acc:.2f}")
+
+    #                 if train_acc >= max_accuracy:
+    #                     max_accuracy = train_acc
+    #                     best_classifier = self.classifier 
+
+    #                 if test_acc > best_test_acc:
+    #                     best_test_acc = test_acc
+    #                     best_classifier = self.classifier 
+    #                     patience_counter = 0 
+    #                 else:
+    #                     patience_counter += 1
+                        
+    #                 if patience_counter >= patience:
+    #                     print(f"Stopping Early: Accuracy hasn't improved for {patience * 5} epochs.")
+    #                     break
+                    
+    #             self.eval_symbol_grounding(env = env)
+
+    #         self.classifier = best_classifier
 
     def train_symbol_grounding(self, num_of_epochs, batch_size=16, env = None):
             
-            # 1. PREPARE DATA LOADER
-            train_data_tensor = self.train_img_seq[0] 
-            train_label_tensor = self.train_acceptance_img[0].type(torch.LongTensor)
-            train_dataset = TensorDataset(train_data_tensor, train_label_tensor)
-            
-            # USE FULL BATCH (Stabilizes Gradients)
-            full_batch_size = len(train_dataset)
-            train_loader = DataLoader(train_dataset, batch_size=full_batch_size, shuffle=True)
-            
-            print(f"_____________TRAINING START_____________")
-            print(f"Samples: {len(train_dataset)} | Actual Batch Size: {full_batch_size} (Full Batch)")
+        # 1. PREPARE DATA LOADER
+        train_data_tensor = self.train_img_seq[0] 
+        train_label_tensor = self.train_acceptance_img[0].type(torch.LongTensor)
+        
+        # --- PI SAFETY CHECK: VALIDATE TARGETS ---
+        # Ensure targets are indices (0, 1, 2) and not raw rewards (0, 100).
+        # If your max label > 2, we clamp it to avoid crashing CrossEntropy.
+        if train_label_tensor.max() >= self.numb_of_rewards:
+            print(f"WARNING: Remapping targets. Max was {train_label_tensor.max()}")
+            train_label_tensor[train_label_tensor > 0] = 1 # Map all positive rewards to Class 1
+        
+        train_dataset = TensorDataset(train_data_tensor, train_label_tensor)
+        
+        # USE FULL BATCH
+        full_batch_size = len(train_dataset)
+        train_loader = DataLoader(train_dataset, batch_size=full_batch_size, shuffle=True)
+        
+        print(f"_____________TRAINING START_____________")
+        print(f"Samples: {len(train_dataset)} | Actual Batch Size: {full_batch_size} (Full Batch)")
 
-            self.deepAutoma.to(device)
-            self.classifier.to(device)
+        self.deepAutoma.to(device)
+        self.classifier.to(device)
+        
+        # --- PI INTERVENTION 1: THE HEAD TRANSPLANT ---
+        # Reset weights to kill "dead neuron" habits from previous failed runs.
+        # IMPORTANT: Once training stabilizes (after ~3 successful calls), 
+        # you can comment this line out to let the agent build long-term memory.
+        # with torch.no_grad():
+        #     self.classifier.fc2.reset_parameters()
+        
+        params = list(self.classifier.parameters()) + list(self.deepAutoma.parameters())
+        optimizer = torch.optim.Adam(params, lr=0.0001)
+
+        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer, mode='min', factor=0.5, patience=20, min_lr=1e-05, verbose=True
+        )
+
+        max_accuracy = 0
+        best_classifier = self.classifier
+        
+        # Temperature: Standard annealing is fine now because Supervision is strong.
+        self.temperature = 2.0      
+        best_test_acc = 0.0
+        patience = 10
+        patience_counter = 0
+        self.classifier.train()
+
+        for epoch in range(num_of_epochs):
+            epoch_losses = []
+            optimizer.zero_grad()
             
-            params = list(self.classifier.parameters()) + list(self.deepAutoma.parameters())
-            optimizer = torch.optim.Adam(params, lr=0.0001)
+            for batch_idx, (batch_imgs, batch_lbls) in enumerate(train_loader):
+                batch_imgs = batch_imgs.to(device)
+                batch_lbls = batch_lbls.to(device)
+                target_rew = batch_lbls.view(-1)
+                
+                curr_batch_size = batch_imgs.size(0)
+                length_seq = batch_imgs.size(1)
 
-            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-                optimizer, mode='min', factor=0.5, patience=20, min_lr=1e-05, verbose=True
-            )
+                # --- A. Forward Pass (Classifier) ---
+                if self.dataset == 'minecraft_image':
+                    flat_imgs = batch_imgs.view(-1, self.num_channels, self.pixels_v, self.pixels_h)
+                    logits = self.classifier(flat_imgs) 
+                else:
+                    logits = self.classifier(batch_imgs)
 
-            max_accuracy = 0
-            best_classifier = self.classifier
-            
-            # Annealing setup
-            self.temperature = 1.0      
-            best_test_acc = 0.0
-            patience = 10
-            patience_counter = 0
+                # --- PI INTERVENTION 2: SUPERVISION MASKS ---
+                # Mask 1: Empty Images (Reward 0)
+                empty_mask = (target_rew == 0)
+                
+                # Mask 2: Gem Images (Reward > 0)
+                gem_mask = (target_rew != 0)
 
-            for epoch in range(num_of_epochs):
-                epoch_losses = []
+                # --- C. Gumbel Softmax ---
+                # We pass raw logits. The supervision loss below handles the guidance.
+                sym_sequences = F.gumbel_softmax(logits, tau=self.temperature, hard=True, dim=-1)
+                sym_sequences = sym_sequences.view(curr_batch_size, length_seq, self.numb_of_symbols)
+
+                # --- D. Forward Pass (Automa) ---
+                pred_states, pred_rew = self.deepAutoma(sym_sequences, self.temperature)
+                pred_rew = pred_rew.view(-1, self.numb_of_rewards)
+
+                # --- E. LOSS CALCULATION ---
+                
+                # 1. RL Loss (Standard)
+                weights = torch.tensor([1.0, 50.0, 50.0]).to(device) 
+                rew_loss = F.nll_loss(torch.log(pred_rew + 1e-9), target_rew, weight=weights)
+
+                # 2. Supervised "Empty" Loss (The Anchor)
+                # If Reward is 0, the Symbol MUST be 0.
+                if empty_mask.any():
+                    empty_logits = logits[empty_mask]
+                    # Target is always class 0 for empty images
+                    empty_targets = torch.zeros(empty_logits.size(0), dtype=torch.long).to(device)
+                    supervised_loss = F.cross_entropy(empty_logits, empty_targets)
+                else:
+                    supervised_loss = 0.0
+
+                # 3. Separation "Gem" Constraint
+                # If Reward is NOT 0, the Symbol MUST NOT be 0.
+                if gem_mask.any():
+                    gem_logits = logits[gem_mask]
+                    gem_probs = F.softmax(gem_logits, dim=-1)
+                    # We penalize the probability of Symbol 0 for Gems.
+                    sym0_probs = gem_probs[:, 0]
+                    separation_loss = -torch.log(1.0 - sym0_probs + 1e-9).mean()
+                else:
+                    separation_loss = 0.0
+
+                # TOTAL LOSS
+                # High weight (10.0) for supervision because it is Ground Truth.
+                loss = rew_loss + (10.0 * supervised_loss) + (10.0 * separation_loss)
+                
+                # -----------------------------------------------------
+
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(params, max_norm=0.5)
+                    
+                optimizer.step()
                 optimizer.zero_grad()
                 
-                # 2. MINI-BATCH LOOP (Actually Full Batch)
-                for batch_idx, (batch_imgs, batch_lbls) in enumerate(train_loader):
-                    
-                    # Move to device
-                    batch_imgs = batch_imgs.to(device)
-                    batch_lbls = batch_lbls.to(device)
+            epoch_losses.append(loss.item())
 
-                    # --- CRITICAL FIX: DEFINE TARGETS FIRST ---
-                    # We need these for the Masking Logic immediately
-                    target_rew = batch_lbls.view(-1)
-                    
-                    curr_batch_size = batch_imgs.size(0)
-                    length_seq = batch_imgs.size(1)
-
-                    # --- A. Forward Pass (Classifier) ---
-                    if self.dataset == 'minecraft_image':
-                        flat_imgs = batch_imgs.view(-1, self.num_channels, self.pixels_v, self.pixels_h)
-                        logits = self.classifier(flat_imgs) 
-                    else:
-                        logits = self.classifier(batch_imgs)
-
-                    # --- B. DEADLOCK BREAKER: LOGIT MASKING ---
-                    # 1. Identify the "Background Symbol" using Empty samples (Reward 0)
-                    zero_rew_mask = (target_rew == 0)
-                    
-                    if zero_rew_mask.any():
-                        with torch.no_grad():
-                            zero_logits = logits[zero_rew_mask]
-                            # Find which symbol has the highest avg probability on empty images
-                            zero_probs = F.softmax(zero_logits, dim=-1).mean(dim=0)
-                            background_symbol_idx = torch.argmax(zero_probs)
-                    else:
-                        background_symbol_idx = 0 # Default fallback
-
-                    # 2. Mask this symbol for "Gem" images (Positive Rewards)
-                    masked_logits = logits.clone()
-                    pos_rew_mask = (target_rew > 0) # Identifies Gems/Lava
-
-                    if pos_rew_mask.any():
-                        # Set the Background Symbol logit to -infinity for Gems.
-                        # This FORCES the model to pick a new symbol (breaking the deadlock).
-                        masked_logits[pos_rew_mask, background_symbol_idx] = -1e9
-
-                    # --- C. Gumbel Softmax (Use Masked Logits!) ---
-                    sym_sequences = F.gumbel_softmax(masked_logits, tau=self.temperature, hard=True, dim=-1)
-                    sym_sequences = sym_sequences.view(curr_batch_size, length_seq, self.numb_of_symbols)
-
-                    # --- D. Forward Pass (Automa) ---
-                    pred_states, pred_rew = self.deepAutoma(sym_sequences, self.temperature)
-                    pred_rew = pred_rew.view(-1, self.numb_of_rewards)
-
-                    # --- E. Loss Calculation ---
-                    
-                    # 1. Weighted Reward Loss (The "Scream" Factor)
-                    # Ensure weights are on device!
-                    # --- E. Loss Calculation ---
-                    
-                    # 1. Weighted Reward Loss (The "Scream" Factor)
-                    weights = torch.tensor([1.0, 50.0, 50.0]).to(device) 
-                    rew_loss = F.nll_loss(torch.log(pred_rew + 1e-9), target_rew, weight=weights)
-
-                    # --- PI INTERVENTION: ANTI-COLLAPSE REGULARIZATION ---
-                    
-                    # Get soft probabilities for entropy calculation
-                    # (Use the unmasked logits to encourage the base network to learn diversity)
-                    probs = F.softmax(logits, dim=-1)
-                    
-                    # 2. Per-Sample Entropy (Encourage Uncertainty/Exploration)
-                    # If the model is 100% sure of Symbol 2, this is 0. We want it > 0 initially.
-                    entropy = -torch.sum(probs * torch.log(probs + 1e-9), dim=-1).mean()
-                    
-                    # 3. Batch Diversity Loss (The "Nuclear Option" for Collapse)
-                    # Calculate the average probability distribution across the ENTIRE batch.
-                    # If the batch is [2, 2, 2, 2], avg_prob is [0, 0, 1, 0].
-                    # We want avg_prob to look like [0.2, 0.2, 0.2, 0.2, 0.2].
-                    avg_probs = torch.mean(probs, dim=0)
-                    batch_entropy = -torch.sum(avg_probs * torch.log(avg_probs + 1e-9))
-                    
-                    # We want to MAXIMIZE batch_entropy (make the batch diverse).
-                    # Since we minimize loss, we subtract it.
-                    
-                    # Hyperparameters for stability
-                    lambda_entropy = 0.05   # Scale for individual exploration
-                    lambda_diversity = 0.5  # Scale for forcing different symbols in a batch
-                    
-                    # Anneal these? Ideally yes, but for now, let's just force the learning.
-                    #if self.exp_num > 0: # Reduce regularization later if needed
-                     #   pass 
-
-                    # TOTAL LOSS
-                    loss = rew_loss - (lambda_entropy * entropy) - (lambda_diversity * batch_entropy)
-                    
-                    # -----------------------------------------------------
-
-                    loss.backward()
-                    torch.nn.utils.clip_grad_norm_(params, max_norm=0.5)
-                        
-                    optimizer.step()
-                    optimizer.zero_grad()
-                    
-                epoch_losses.append(loss.item())
-
-                # --- F. End of Epoch Updates ---
-                mean_loss_new = mean(epoch_losses)
-                scheduler.step(mean_loss_new)
-                
-                # Fast Annealing
-                if epoch > 0:
-                    self.temperature = max(0.1, self.temperature * 0.95)
-
-                if epoch % 5 == 0:
-                    train_acc, _, _, test_acc = self.eval_all(automa_implementation='logic_circuit', temperature=1, discretize_labels=True)
-                    print(f"Epoch {epoch} | Loss: {mean_loss_new:.4f} | Temp: {self.temperature:.4f} | Train Acc: {train_acc:.2f} | Test Acc: {test_acc:.2f}")
-
-                    if train_acc >= max_accuracy:
-                        max_accuracy = train_acc
-                        best_classifier = self.classifier 
-
-                    if test_acc > best_test_acc:
-                        best_test_acc = test_acc
-                        best_classifier = self.classifier 
-                        patience_counter = 0 
-                    else:
-                        patience_counter += 1
-                        
-                    if patience_counter >= patience:
-                        print(f"Stopping Early: Accuracy hasn't improved for {patience * 5} epochs.")
-                        break
-                    
-                self.eval_symbol_grounding(env = env)
-
-            self.classifier = best_classifier
+            # --- F. End of Epoch Updates ---
+            mean_loss_new = mean(epoch_losses)
+            scheduler.step(mean_loss_new)
             
+            # Anneal Temperature
+            if epoch > 0:
+                    self.temperature = max(0.5, self.temperature * 0.95)
 
+            if epoch % 5 == 0:
+                train_acc, _, _, test_acc = self.eval_all(automa_implementation='logic_circuit', temperature=1, discretize_labels=True)
+                print(f"Epoch {epoch} | Loss: {mean_loss_new:.4f} | Temp: {self.temperature:.4f} | Train Acc: {train_acc:.2f} | Test Acc: {test_acc:.2f}")
+
+                if train_acc >= max_accuracy:
+                    max_accuracy = train_acc
+                    best_classifier = self.classifier 
+
+                if test_acc > best_test_acc:
+                    best_test_acc = test_acc
+                    best_classifier = self.classifier 
+                    patience_counter = 0 
+                else:
+                    patience_counter += 1
+                    
+                if patience_counter >= patience:
+                    print(f"Stopping Early: Accuracy hasn't improved for {patience * 5} epochs.")
+                    break
+        self.classifier.eval()    
+        self.eval_symbol_grounding(env = env)
+        self.classifier.train()
+
+        self.classifier = best_classifier
 
     def train_DFA(self, batch_size, num_of_epochs, decay=0.999, freezed=False):
         def get_lr(optim):
@@ -451,7 +581,7 @@ class NeuralRewardMachine:
         
         return train_acc, test_acc
 
-    def eval_symbol_grounding(self, env = None):
+    def eval_symbol_grounding_old(self, env = None):
         
 
         #TODO: classificare i simboli per debugging. Usare tutte le osservazione precomputed e il classificatore di Neural Reward Machine
@@ -478,3 +608,41 @@ class NeuralRewardMachine:
                 for s in pred_symbols:
                     predicted[s] +=1
         print("Predicted symbol counts: ", predicted)
+
+    def eval_symbol_grounding(self, env=None):
+        # 1. Set model to evaluation mode (CRITICAL for BatchNorm)
+        self.classifier.eval() 
+        
+        traces_to_test = env.env.loc_to_obs
+        
+        with torch.no_grad():
+            # Check output dimension to ensure it matches your expectations
+            dummy_out = self.classifier(torch.randn((1, 3, 64, 64), dtype=torch.double).to(device)).squeeze()
+            classifier_output_len = len(dummy_out)
+            
+            # Initialize counters
+            predicted = [0 for _ in range(classifier_output_len)]
+            
+            # Store predictions to visualize the map (Optional but helpful)
+            map_predictions = np.zeros((env.map_size, env.map_size))
+
+            for loc in traces_to_test.keys():
+                obs = traces_to_test[loc]
+                
+                # Normalize is NOT needed here because env.loc_to_obs is already 0.0-1.0 float
+                obs = torch.from_numpy(obs).double().to(device).unsqueeze(0)
+                
+                logits = self.classifier(obs)
+                pred_symbol = torch.argmax(logits, dim=1).item()
+                
+                # Safety check for index out of bounds
+                if pred_symbol < len(predicted):
+                    predicted[pred_symbol] += 1
+                
+                map_predictions[loc] = pred_symbol
+
+        print(f"Predicted symbol counts (Total {sum(predicted)}): {predicted}")
+        print("Model Output Dimension:", classifier_output_len)
+        
+        # 2. Set model back to train mode
+        self.classifier.train()

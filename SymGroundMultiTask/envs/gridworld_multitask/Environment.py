@@ -33,8 +33,8 @@ class GridWorldEnv_multitask(gym.Env):
     
 
     def __init__(self, render_mode="human", state_type="image", obs_size=(56,56), win_size=(896,896), map_size=7,
-        max_num_steps=30, randomize_loc=False, randomize_start=True, img_dir="imgs_16x16", save_obs=True,
-        symbols=['c0', 'c1', 'c2', 'c3', 'c4'], wrap_around_map=True, agent_centric_view=True):
+        max_num_steps=30, randomize_loc=True, randomize_start=True, img_dir="imgs_16x16", save_obs=False,
+        symbols=['c0', 'c1', 'c2', 'c3'], wrap_around_map=True, agent_centric_view=True):
 
         self.dictionary_symbols = symbols + ['']
         self.num_symbols = len(self.dictionary_symbols)
@@ -42,14 +42,22 @@ class GridWorldEnv_multitask(gym.Env):
         print(max_num_steps)
         
         
-        print("symbols:", self.dictionary_symbols)
+        
         
         GridWorldEnv_multitask.symbol_to_index = { symbol: idx for idx, symbol in enumerate(self.dictionary_symbols) }
+
+        
+        #the selected symbols for the current environment
+        print("Symbol to name mapping:")
+        for symbol in self.dictionary_symbols:
+            print(f"  {symbol} -> {self.symbol_to_name[symbol]}")
+
+        
+
         
         self.dictionary_icons = [self.symbol_to_name[symbol] for symbol in self.dictionary_symbols[:-1]]
         
         
-
         self.randomize_locations = randomize_loc
         self.randomize_start = randomize_start
 
@@ -60,6 +68,8 @@ class GridWorldEnv_multitask(gym.Env):
         self.has_window = False
         self.map_size = map_size
         self.obs_size = obs_size
+
+        self.save_obs = save_obs
         
         
         
@@ -155,8 +165,8 @@ class GridWorldEnv_multitask(gym.Env):
         if self.randomize_locations:
 
             # select random locations for items
-            #num_items = (self.num_symbols-1)*2
-            num_items = self.num_symbols - 1
+            num_items = (self.num_symbols-1)*2
+            #num_items = self.num_symbols - 1
             sampled_locations = random.sample(self.all_locations, num_items)
 
             # assign item locations
@@ -179,21 +189,21 @@ class GridWorldEnv_multitask(gym.Env):
         # compute initial observation
         observation = self.loc_to_obs[self.agent_location]
 
-        observation = self._get_image_obs()
+        #observation = self._get_image_obs()
 
-        
+        if self.save_obs:
 
-        # #save as an image the observation
-        # image = (np.transpose(observation) * 255).astype(np.uint8)
-        # image_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+            # #save as an image the observation
+            image = (np.transpose(observation * 255)).astype(np.uint8)
+            image_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
-        # #save it in ./
-        # obs_folder = os.path.join(REPO_DIR, 'saves/env_obs')
-        # if not os.path.exists(obs_folder):
-        #     os.makedirs(obs_folder)
-        # obs_path = os.path.join(obs_folder, f'obs_reset_{self.num_episodes}.png')
-        # cv2.imwrite(obs_path, image_bgr)
-        #print(f"Saved observation image at {obs_path}")
+            # #save it in ./
+            obs_folder = os.path.join(REPO_DIR, 'saves/env_obs')
+            if not os.path.exists(obs_folder):
+                os.makedirs(obs_folder)
+            obs_path = os.path.join(obs_folder, f'obs_reset_{self.num_episodes}.png')
+            cv2.imwrite(obs_path, image_bgr)
+            print(f"Saved observation image at {obs_path}")
         
 
 
@@ -279,6 +289,7 @@ class GridWorldEnv_multitask(gym.Env):
         for label, icon in enumerate(self.dictionary_icons):
             for loc in self.icon_locations[icon]:
                 self.loc_to_label[loc] = label
+                
 
         if self.state_type == "image":
 
@@ -301,20 +312,24 @@ class GridWorldEnv_multitask(gym.Env):
                     cv2.imwrite(obs_path, image_bgr)
 
             # normalize observations
-            mean = np.mean(self.loc_to_obs[self.initial_agent_location])
-            stdev = np.std(self.loc_to_obs[self.initial_agent_location])
+            #mean = np.mean(self.loc_to_obs[self.initial_agent_location])
+            #stdev = np.std(self.loc_to_obs[self.initial_agent_location])
 
-            self.mean = mean
-            self.stdev = stdev
 
-            for loc in self.all_locations:
-                norm_img = (self.loc_to_obs[loc] - mean) / (stdev + 1e-10)
-                self.loc_to_obs[loc] = norm_img
-                if save_obs:
-                    image = (np.transpose(norm_img, (1, 2, 0)) * 255).astype(np.uint8)
-                    image_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-                    obs_path = os.path.join(obs_folder, f'obs_norm_{loc[0]}_{loc[1]}.png')
-                    cv2.imwrite(obs_path, image_bgr)
+            #self.mean = mean
+            #self.stdev = stdev
+
+            #print(f"Observation mean: {mean}, stdev: {stdev}")
+
+
+            # for loc in self.all_locations:
+            #     norm_img = (self.loc_to_obs[loc] - mean) / (stdev + 1e-10)
+            #     self.loc_to_obs[loc] = norm_img
+            #     if save_obs:
+            #         image = (np.transpose(norm_img, (1, 2, 0)) * 255).astype(np.uint8)
+            #         image_bgr = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+            #         obs_path = os.path.join(obs_folder, f'obs_norm_{loc[0]}_{loc[1]}.png')
+            #         cv2.imwrite(obs_path, image_bgr)
 
         elif self.state_type == "symbol":
 
@@ -618,6 +633,7 @@ class GridWorldEnv_12_Base(GridWorldEnv_LTL2Action):
             wrap_around_map = True,
             agent_centric_view = False
         )
+
 
 
 class GridWorldEnv_12_Base_FixedMap(GridWorldEnv_LTL2Action):

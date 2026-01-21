@@ -554,7 +554,7 @@ def recurrent_A2C(
             if env.state_type == "symbol":
                 acc, _ = grounder.eval_image_classification()
             else:
-                grounder.eval_symbol_grounding(env=env)
+                
                 acc = 0
             image_accuracy.append(acc)
             with open(
@@ -629,6 +629,7 @@ def recurrent_A2C(
                 rew_traj = []
                 info_traj = []
                 sum_rew_traj = []
+                grounder.eval_symbol_grounding(env=env)
             
             
         
