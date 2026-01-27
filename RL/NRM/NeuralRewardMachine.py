@@ -45,6 +45,7 @@ class NeuralRewardMachine:
         self.numb_of_symbols = numb_symbols
         self.numb_of_states = numb_states
         self.numb_of_rewards = numb_rewards
+        
 
         self.alphabet = ["c"+str(i) for i in range(self.numb_of_symbols) ]
 
@@ -110,13 +111,54 @@ class NeuralRewardMachine:
         #[0,1,0,0,0] lava
         #[1,0,0,0,0] pick
 
-    def set_dataset(self, image_traj, rew_traj):
+        self.deepAutoma.to(device)
+        self.classifier.to(device)
+
+        # 1. PERSIST OPTIMIZER
+        self.params = list(self.classifier.parameters()) + list(self.deepAutoma.parameters())
+        self.optimizer = torch.optim.Adam(self.params, lr=5e-5)
+
+        # 2. PERSIST SCHEDULER
+        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+            self.optimizer, mode='min', factor=0.5, patience=20, min_lr=1e-05, verbose=True
+        )
+
+        # 3. PERSIST TEMPERATURE
+        self.temperature = 2.0  # Start high, decay over time
+
+    def set_dataset_old(self, image_traj, rew_traj):
         
         dataset_acceptances = torch.LongTensor(rew_traj)
         dataset_traces = torch.stack([torch.stack(inner) for inner in image_traj])
 
         image_seq_dataset = ([dataset_traces], [], [dataset_acceptances], [dataset_traces], [], [dataset_acceptances])
         self.train_img_seq, self.train_traces, self.train_acceptance_img, self.test_img_seq_hard, self.test_traces, self.test_acceptance_img_hard = image_seq_dataset
+
+        return image_seq_dataset
+    def set_dataset(self, image_traj, rew_traj):
+    
+    # Create Labels Tensor
+        dataset_acceptances = torch.LongTensor(rew_traj)
+
+        # Create Images Tensor
+        # Optimization: Convert DoubleTensor (float64) to FloatTensor (float32) 
+        # to save 50% RAM and speed up training.
+        dataset_traces = torch.stack([torch.stack(inner) for inner in image_traj])
+
+        # Pack into the tuple structure your class expects
+        # Structure: (Train_X, _, Train_Y, Test_X, _, Test_Y)
+        image_seq_dataset = (
+            [dataset_traces],      # Train Images
+            [],                    # Unused
+            [dataset_acceptances], # Train Labels
+            [dataset_traces],      # Test Images (We use same for now)
+            [],                    # Unused
+            [dataset_acceptances]  # Test Labels
+        )
+
+        # Assign to class attributes
+        self.train_img_seq, self.train_traces, self.train_acceptance_img, \
+        self.test_img_seq_hard, self.test_traces, self.test_acceptance_img_hard = image_seq_dataset
 
         return image_seq_dataset
 
@@ -309,10 +351,10 @@ class NeuralRewardMachine:
         
         # USE FULL BATCH
         full_batch_size = len(train_dataset)
-        train_loader = DataLoader(train_dataset, batch_size=full_batch_size, shuffle=True)
+        train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
         
         print(f"_____________TRAINING START_____________")
-        print(f"Samples: {len(train_dataset)} | Actual Batch Size: {full_batch_size} (Full Batch)")
+        print(f"Samples: {len(train_dataset)} | Actual Batch Size: {batch_size}")
 
         self.deepAutoma.to(device)
         self.classifier.to(device)
@@ -323,13 +365,10 @@ class NeuralRewardMachine:
         # you can comment this line out to let the agent build long-term memory.
         # with torch.no_grad():
         #     self.classifier.fc2.reset_parameters()
-        
-        params = list(self.classifier.parameters()) + list(self.deepAutoma.parameters())
-        optimizer = torch.optim.Adam(params, lr=0.0001)
-
-        scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            optimizer, mode='min', factor=0.5, patience=20, min_lr=1e-05, verbose=True
-        )
+        if self.temperature < 0.5:
+            self.temperature = 1.0 
+            print("Bumping Temperature to 1.0 for adaptation.")
+            
 
         max_accuracy = 0
         best_classifier = self.classifier
@@ -340,10 +379,12 @@ class NeuralRewardMachine:
         patience = 10
         patience_counter = 0
         self.classifier.train()
+        empty_class_idx = self.numb_of_symbols - 1 
 
+        
         for epoch in range(num_of_epochs):
             epoch_losses = []
-            optimizer.zero_grad()
+            self.optimizer.zero_grad()
             
             for batch_idx, (batch_imgs, batch_lbls) in enumerate(train_loader):
                 batch_imgs = batch_imgs.to(device)
@@ -353,77 +394,82 @@ class NeuralRewardMachine:
                 curr_batch_size = batch_imgs.size(0)
                 length_seq = batch_imgs.size(1)
 
-                # --- A. Forward Pass (Classifier) ---
+                # --- Forward Pass ---
                 if self.dataset == 'minecraft_image':
                     flat_imgs = batch_imgs.view(-1, self.num_channels, self.pixels_v, self.pixels_h)
                     logits = self.classifier(flat_imgs) 
                 else:
                     logits = self.classifier(batch_imgs)
 
-                # --- PI INTERVENTION 2: SUPERVISION MASKS ---
+                # --- Supervision Masks ---
                 # Mask 1: Empty Images (Reward 0)
                 empty_mask = (target_rew == 0)
                 
-                # Mask 2: Gem Images (Reward > 0)
-                gem_mask = (target_rew != 0)
+                # Mask 2: Interesting Images (Reward > 0)
+                item_mask = (target_rew != 0)
 
-                # --- C. Gumbel Softmax ---
-                # We pass raw logits. The supervision loss below handles the guidance.
+                # --- Gumbel Softmax & Automa Pass ---
                 sym_sequences = F.gumbel_softmax(logits, tau=self.temperature, hard=True, dim=-1)
                 sym_sequences = sym_sequences.view(curr_batch_size, length_seq, self.numb_of_symbols)
-
-                # --- D. Forward Pass (Automa) ---
                 pred_states, pred_rew = self.deepAutoma(sym_sequences, self.temperature)
                 pred_rew = pred_rew.view(-1, self.numb_of_rewards)
 
-                # --- E. LOSS CALCULATION ---
+                # --- LOSS CALCULATION ---
                 
                 # 1. RL Loss (Standard)
-                weights = torch.tensor([1.0, 50.0, 50.0]).to(device) 
-                rew_loss = F.nll_loss(torch.log(pred_rew + 1e-9), target_rew, weight=weights)
+                # Weights to handle class imbalance in rewards (0 is common, 100 is rare)
+                # Calculate frequency
+                class_counts = torch.bincount(target_rew, minlength=self.numb_of_rewards)
 
-                # 2. Supervised "Empty" Loss (The Anchor)
-                # If Reward is 0, the Symbol MUST be 0.
+                # Logarithmic Smoothing for Weights
+                # Instead of 1/count (which explodes for rare items), use 1 / log(count + 1.2)
+                # This is standard in computer vision for unbalanced datasets.
+                class_weights = 1.0 / (class_counts.float() + 0.1) 
+
+#                Normalize weights so they sum to 1 (or len(classes))
+                class_weights = class_weights / class_weights.sum() * self.numb_of_rewards
+                rew_loss = F.nll_loss(torch.log(pred_rew + 1e-9), target_rew, weight=class_weights)
+
+                # 2. Supervised "Empty" Loss (CORRECTED)
                 if empty_mask.any():
                     empty_logits = logits[empty_mask]
-                    # Target is always class 0 for empty images
-                    empty_targets = torch.zeros(empty_logits.size(0), dtype=torch.long).to(device)
+                    
+                    # FIX: Use empty_class_idx instead of 0
+                    empty_targets = torch.full((empty_logits.size(0),), empty_class_idx, dtype=torch.long).to(device)
+                    
                     supervised_loss = F.cross_entropy(empty_logits, empty_targets)
                 else:
                     supervised_loss = 0.0
 
-                # 3. Separation "Gem" Constraint
-                # If Reward is NOT 0, the Symbol MUST NOT be 0.
-                if gem_mask.any():
-                    gem_logits = logits[gem_mask]
-                    gem_probs = F.softmax(gem_logits, dim=-1)
-                    # We penalize the probability of Symbol 0 for Gems.
-                    sym0_probs = gem_probs[:, 0]
-                    separation_loss = -torch.log(1.0 - sym0_probs + 1e-9).mean()
+                # 3. Separation Constraint
+                # If Reward > 0, the Symbol CANNOT be "Empty"
+                if item_mask.any():
+                    item_logits = logits[item_mask]
+                    item_probs = F.softmax(item_logits, dim=-1)
+                    
+                    # We penalize the probability of the Empty Class for items
+                    prob_of_empty = item_probs[:, empty_class_idx]
+                    separation_loss = -torch.log(1.0 - prob_of_empty + 1e-9).mean()
                 else:
                     separation_loss = 0.0
+                
+                entropy = -torch.sum(F.softmax(logits, dim=-1) * F.log_softmax(logits, dim=-1), dim=-1).mean()
 
                 # TOTAL LOSS
-                # High weight (10.0) for supervision because it is Ground Truth.
-                loss = rew_loss + (10.0 * supervised_loss) + (10.0 * separation_loss)
-                
-                # -----------------------------------------------------
-
+                # We trust the Supervision (Empty detection) the most
+                loss = rew_loss + (5.0 * supervised_loss) + (2.0 * separation_loss) - (0.1 * entropy)
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(params, max_norm=0.5)
-                    
-                optimizer.step()
-                optimizer.zero_grad()
+                torch.nn.utils.clip_grad_norm_(self.params, max_norm=0.5)
+                self.optimizer.step()
+                self.optimizer.zero_grad()
                 
             epoch_losses.append(loss.item())
-
-            # --- F. End of Epoch Updates ---
             mean_loss_new = mean(epoch_losses)
-            scheduler.step(mean_loss_new)
+            self.scheduler.step(mean_loss_new)
             
             # Anneal Temperature
             if epoch > 0:
-                    self.temperature = max(0.5, self.temperature * 0.95)
+                self.temperature = max(0.5, self.temperature * 0.98) # Slower decay
 
             if epoch % 5 == 0:
                 train_acc, _, _, test_acc = self.eval_all(automa_implementation='logic_circuit', temperature=1, discretize_labels=True)
@@ -447,7 +493,27 @@ class NeuralRewardMachine:
         self.eval_symbol_grounding(env = env)
         self.classifier.train()
 
-        self.classifier = best_classifier
+        # Load best weights from this training session
+        new_state_dict = best_classifier.state_dict()
+        old_state_dict = self.classifier.state_dict()
+        
+        # Soft Update (Polyak Averaging)
+        # Tau = 0.2 means we keep 80% of old knowledge and accept 20% new
+        tau = 0.2 
+        
+        for key in old_state_dict:
+            # theta_new = tau * theta_learned + (1 - tau) * theta_old
+            old_state_dict[key] = tau * new_state_dict[key] + (1 - tau) * old_state_dict[key]
+            
+        self.classifier.load_state_dict(old_state_dict)
+
+
+
+
+
+
+
+
 
     def train_DFA(self, batch_size, num_of_epochs, decay=0.999, freezed=False):
         def get_lr(optim):
@@ -610,39 +676,70 @@ class NeuralRewardMachine:
         print("Predicted symbol counts: ", predicted)
 
     def eval_symbol_grounding(self, env=None):
-        # 1. Set model to evaluation mode (CRITICAL for BatchNorm)
-        self.classifier.eval() 
+        self.classifier.eval()
         
-        traces_to_test = env.env.loc_to_obs
+        all_obs = []
+        original_pos = env.env.agent_location
+        map_size = env.env.map_size
         
+        # FIX: Iterate systematically (Row-Major Order)
+        # This ensures the tensor matches the print loop later
+        for r in range(map_size):
+            for c in range(map_size):
+                env.env.agent_location = (r, c)
+                obs = env.env._get_image_obs()
+                all_obs.append(torch.from_numpy(obs).double())
+            
+        env.env.agent_location = original_pos
+
+        # Stack and Cast
+        batch_obs = torch.stack(all_obs).double().to(device) 
+
         with torch.no_grad():
-            # Check output dimension to ensure it matches your expectations
-            dummy_out = self.classifier(torch.randn((1, 3, 64, 64), dtype=torch.double).to(device)).squeeze()
-            classifier_output_len = len(dummy_out)
-            
-            # Initialize counters
-            predicted = [0 for _ in range(classifier_output_len)]
-            
-            # Store predictions to visualize the map (Optional but helpful)
-            map_predictions = np.zeros((env.map_size, env.map_size))
+            logits = self.classifier(batch_obs)
+            pred_symbols = torch.argmax(logits, dim=1).cpu().tolist()
 
-            for loc in traces_to_test.keys():
-                obs = traces_to_test[loc]
-                
-                # Normalize is NOT needed here because env.loc_to_obs is already 0.0-1.0 float
-                obs = torch.from_numpy(obs).double().to(device).unsqueeze(0)
-                
-                logits = self.classifier(obs)
-                pred_symbol = torch.argmax(logits, dim=1).item()
-                
-                # Safety check for index out of bounds
-                if pred_symbol < len(predicted):
-                    predicted[pred_symbol] += 1
-                
-                map_predictions[loc] = pred_symbol
+        # Count results
+        classifier_output_len = logits.shape[1]
+        predicted = [0] * classifier_output_len
+        for s in pred_symbols:
+            predicted[s] += 1
 
-        print(f"Predicted symbol counts (Total {sum(predicted)}): {predicted}")
-        print("Model Output Dimension:", classifier_output_len)
+        print(f"Predicted symbol counts: {predicted}")
+
+        # Visual Mapping
+        # Update this list if your environment symbols change!
+        chars = ['P', 'L', 'D', 'G', '.'] 
+
+        print("\n--- Ground Truth (Real Map) ---")
+        gt_str = ""
+        for r in range(map_size):
+            row_str = ""
+            for c in range(map_size):
+                # Get True Label
+                true_idx = env.env.loc_to_label.get((r, c), env.env.num_symbols - 1)
+                if true_idx < len(chars):
+                    row_str += chars[true_idx] + " "
+                else:
+                    row_str += "? "
+            gt_str += row_str + "\n"
+        print(gt_str)
+
+        print("--- Agent's Worldview (Prediction) ---")
+        pred_str = ""
+        for r in range(map_size):
+            row_str = ""
+            for c in range(map_size):
+                # FIX: Calculate index based on Row-Major Order
+                idx = r * map_size + c
+                sym = pred_symbols[idx]
+                
+                if sym < len(chars):
+                    row_str += chars[sym] + " "
+                else:
+                    row_str += "? "
+            pred_str += row_str + "\n"
+        print(pred_str)
+        print("------------------------------------\n")
         
-        # 2. Set model back to train mode
         self.classifier.train()

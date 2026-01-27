@@ -47,7 +47,7 @@ class CNN_grounder_old(nn.Module):
 
 
     
-class CNN_grounder(nn.Module):
+class CNN_grounder_old_gemini(nn.Module): #FAI ROLLBACK NEL QUI NEL CASO
     def __init__(self, num_symbols):
         super(CNN_grounder, self).__init__()
         
@@ -117,3 +117,77 @@ class Linear_grounder(nn.Module):
         x = self.grounder(x)
         return x
         #return sftmx_with_temp(x, temp)
+
+
+
+class CNN_grounder_rollback(nn.Module):
+    def __init__(self, num_symbols):
+        super(CNN_grounder, self).__init__()
+        
+        # We use Stride=2 instead of MaxPool to learn how to downsample
+        # Input: 3 x 64 x 64
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, stride=2, padding=1) # -> 32 x 32 x 32
+        self.bn1 = nn.BatchNorm2d(32)
+        
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1) # -> 64 x 16 x 16
+        self.bn2 = nn.BatchNorm2d(64)
+        
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1) # -> 128 x 8 x 8
+        self.bn3 = nn.BatchNorm2d(128)
+
+        self.dropout = nn.Dropout(0.3)
+        
+        # Flatten size: 128 channels * 8 * 8
+        self.flat_size = 128 * 8 * 8 
+        
+        self.fc1 = nn.Linear(self.flat_size, 256)
+        self.fc2 = nn.Linear(256, num_symbols)
+
+    def forward(self, x):
+        x = F.relu(self.bn1(self.conv1(x)))
+        x = F.relu(self.bn2(self.conv2(x)))
+        x = F.relu(self.bn3(self.conv3(x)))
+        
+        x = x.view(-1, self.flat_size) 
+        
+        x = F.relu(self.fc1(x))
+        x = self.dropout(x)
+        x = self.fc2(x)
+        return x
+    
+
+class CNN_grounder(nn.Module):
+    def __init__(self, num_symbols):
+        super(CNN_grounder, self).__init__()
+        
+        # Conv 1: 3 -> 32
+        self.conv1 = nn.Conv2d(3, 32, kernel_size=3, stride=2, padding=1)
+        self.gn1 = nn.GroupNorm(4, 32) # GroupNorm is stable for batch_size=1
+        
+        # Conv 2: 32 -> 64
+        self.conv2 = nn.Conv2d(32, 64, kernel_size=3, stride=2, padding=1)
+        self.gn2 = nn.GroupNorm(8, 64)
+        
+        # Conv 3: 64 -> 128
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1)
+        self.gn3 = nn.GroupNorm(16, 128)
+
+        # Removed Dropout (Too aggressive for small icons)
+        
+        # Flatten size: 128 channels * 8 * 8
+        self.flat_size = 128 * 8 * 8 
+        
+        self.fc1 = nn.Linear(self.flat_size, 256)
+        self.fc2 = nn.Linear(256, num_symbols)
+
+    def forward(self, x):
+        x = F.relu(self.gn1(self.conv1(x)))
+        x = F.relu(self.gn2(self.conv2(x)))
+        x = F.relu(self.gn3(self.conv3(x)))
+        
+        x = x.view(-1, self.flat_size) 
+        
+        x = F.relu(self.fc1(x))
+        # Removed Dropout
+        x = self.fc2(x)
+        return x

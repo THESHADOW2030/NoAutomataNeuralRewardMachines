@@ -15,6 +15,7 @@ from .NRM.utils import eval_acceptance
 from collections import deque
 import numpy as np
 import cv2
+
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 print(device)
@@ -58,43 +59,47 @@ TTT = 10
 TT_policy = 1  # Was 5. Update every episode.
 
 # 2. Train Grounder frequently so the Agent adapts to changes
-TT_grounder = 10 # Was 50. Don't let the agent run blind for too long.
+TT_grounder = 10  # Was 50. Don't let the agent run blind for too long.
 
 # 3. Prevent Overfitting in the Grounder
-grounder_epochs = 150 # Was 100. Short bursts of learning are better.
+grounder_epochs = 150  # Was 100. Short bursts of learning are better.
 
 # 4. A2C Params (Standard)
-lr = 0.0007       # Slightly higher because batch size is effectively smaller now
-num_steps = 5     # Keep this (standard n-step return)
-hidden_size = 120 # Keep this
+lr = 0.0007  # Slightly higher because batch size is effectively smaller now
+num_steps = 5  # Keep this (standard n-step return)
+hidden_size = 120  # Keep this
 
 # 5. Data Collection
 # Ensure your buffer logic doesn't crash if you don't have 64 samples yet
 # You might want to lower this to 32 if episodes are successful rarely
-target_batch_grounder = 128
+target_batch_grounder = 1024
 
 
-
-
-#-------------------GEMINI-------------------#
-TT_grounder = 50
-grounder_epochs = 50
+# -------------------GEMINI-------------------#
+TT_grounder = 10
+grounder_epochs = 10
 max_episodes = 10000
 
 
-
-
-
-
-
 import os
+
+
 def plot_smoothed_sequence_classification_accuracy():
-#read sequence_classification_accuracy_0.txt
+    # read sequence_classification_accuracy_0.txt
     for i in range(5):
-    #check if file exists
-        if not os.path.exists(os.path.join(os.path.dirname(__file__), f'sequence_classification_accuracy_{i}.txt')):
-            continue 
-        with open(os.path.join(os.path.dirname(__file__), f'sequence_classification_accuracy_{i}.txt'), 'r') as f:
+        # check if file exists
+        if not os.path.exists(
+            os.path.join(
+                os.path.dirname(__file__), f"sequence_classification_accuracy_{i}.txt"
+            )
+        ):
+            continue
+        with open(
+            os.path.join(
+                os.path.dirname(__file__), f"sequence_classification_accuracy_{i}.txt"
+            ),
+            "r",
+        ) as f:
             lines = f.readlines()
 
         lines = [line.strip() for line in lines if line.strip()]
@@ -110,21 +115,25 @@ def plot_smoothed_sequence_classification_accuracy():
                 smoothed.append((i, mean / (i % 100 + 1)))  # handle last segment
         lines = smoothed
 
-        #plot the smoothed values
+        # plot the smoothed values
         import matplotlib.pyplot as plt
+
         plt.plot(*zip(*lines))
-        plt.xlabel('Training Steps (x100)')
-        plt.ylabel('Sequence Classification Accuracy')
-        plt.title('Smoothed Sequence Classification Accuracy over Training Steps')
+        plt.xlabel("Training Steps (x100)")
+        plt.ylabel("Sequence Classification Accuracy")
+        plt.title("Smoothed Sequence Classification Accuracy over Training Steps")
         plt.grid()
-        plt.savefig(os.path.join(os.path.dirname(__file__), f'sequence_classification_accuracy_smoothed_{i}.png'))
+        plt.savefig(
+            os.path.join(
+                os.path.dirname(__file__),
+                f"sequence_classification_accuracy_smoothed_{i}.png",
+            )
+        )
         plt.close()
 
-
-
-
-
         print(list(lines))
+
+
 # Compute the returns (of the rewards) for one episode
 def compute_returns(next_value, rewards, masks, gamma=0.99):
     R = next_value
@@ -170,25 +179,20 @@ def recurrent_A2C(
     #       - 'nrm'     (grounding+A2C)
     #       - 'rm'    (reward machines)
 
-    
-
     #################### reinitialize files if they exist or create them
 
     f = open(path + "/train_rewards_" + str(experiment) + ".txt", "w")
     f.close()
 
-    #IMPORTANTE: STEP E LA MOORE MACHINE NEL INIT DEL VECCHIO ENV (DA METTERE IN LTL_WRAPPERS)
-    #PROVARE A BYPASSARE IL WRAPPER E USARE DIRETTAMENTE L'ENV
+    # IMPORTANTE: STEP E LA MOORE MACHINE NEL INIT DEL VECCHIO ENV (DA METTERE IN LTL_WRAPPERS)
+    # PROVARE A BYPASSARE IL WRAPPER E USARE DIRETTAMENTE L'ENV
 
-
-    #STEP FATTO
-
-    
+    # STEP FATTO
 
     rnn_hidden_size = hidden_size_rnn
 
     # num_of_states_override = 5
-    # num_of_symbols_override = 5 
+    # num_of_symbols_override = 5
     # num_automaton_outputs = 1
 
     # print(env.__module__)
@@ -215,7 +219,6 @@ def recurrent_A2C(
 
     saved_traces = []
 
-    
     #################### env dimensions
     # number of actions
     num_outputs = env.action_space.n
@@ -227,11 +230,11 @@ def recurrent_A2C(
         CNN_output_size = 16
         num_inputs = CNN_output_size
         params += list(cnn.parameters())
-        
+
     else:
         num_inputs = env.state_space_size
-        #num_inputs = env.observation_space.shape
-        #print(f"env.observation_space.shape: {env.observation_space.shape}")
+        # num_inputs = env.observation_space.shape
+        # print(f"env.observation_space.shape: {env.observation_space.shape}")
 
     # Initializing the Actor critic model
     if method == "rnn":
@@ -286,6 +289,7 @@ def recurrent_A2C(
 
         sequence_accuracy = []
         image_accuracy = []
+
         # Balanced replay buffers: positive (contains any 1) and non-positive (only 0/-1)
         class TraceReplayBuffer:
             def __init__(self, capacity=2000):
@@ -302,17 +306,19 @@ def recurrent_A2C(
             def sample(self, n):
                 if len(self.data) == 0:
                     return []
-                idxs = np.random.choice(len(self.data), size=min(n, len(self.data)), replace=False)
+                idxs = np.random.choice(
+                    len(self.data), size=min(n, len(self.data)), replace=False
+                )
                 return [self.data[i] for i in idxs]
 
-        positive_buffer = TraceReplayBuffer(capacity=10000)
-        nonpos_buffer = TraceReplayBuffer(capacity=10000)
+        positive_buffer = TraceReplayBuffer(capacity=50000)
+        nonpos_buffer = TraceReplayBuffer(capacity=50000)
         # derive label ids for +1, 0, -1 rewards from env mapping if available
-        
+
         pos_label = None
-        
+
         neg_label = None
-        if hasattr(env, 'rew_dictionary'):
+        if hasattr(env, "rew_dictionary"):
             # env.rew_dictionary maps reward_value -> idx
             if 100 in env.rew_dictionary:
                 pos_label = env.rew_dictionary[100]
@@ -320,7 +326,6 @@ def recurrent_A2C(
         # fallback reasonable defaults
         if pos_label is None:
             pos_label = 100
-
 
     optimizer = optim.Adam(params, lr=lr)
 
@@ -340,10 +345,9 @@ def recurrent_A2C(
         done = False
         truncated = False
 
-        
         obs, reward, info = env.reset()
 
-        #print the path of the module env
+        # print the path of the module env
         # print(f"Module env path: {env.__module__}")
         # print(f"Initial observation shape: {obs.shape}")
 
@@ -353,12 +357,11 @@ def recurrent_A2C(
 
             if feature_extraction:
                 state_env = cnn(state_env.view(-1, 3, 64, 64))
-                
-                
+
             state = torch.cat((state_env, state_dfa.unsqueeze(0)), 1).squeeze()
         else:
             state = torch.DoubleTensor(obs).to(device)
-            #print(f"Initial state shape: {state.shape}")
+            # print(f"Initial state shape: {state.shape}")
             if method == "rnn":
                 # Initialize hidden and cell states
                 h_0 = torch.zeros(num_layers, rnn_hidden_size).to(device).double()
@@ -369,11 +372,12 @@ def recurrent_A2C(
                 state_automa[0] = 1.0
                 state_automa = torch.tensor(state_automa).to(device)
 
+                
+
             raw_state = state
             if feature_extraction:
                 state = cnn(state.view(-1, 3, 64, 64))
                 state = state.squeeze()
-                
 
         # first step with RNN or dfa
         if method == "rnn":
@@ -384,23 +388,24 @@ def recurrent_A2C(
             next_state_automa, reward_automa = grounder.deepAutoma.step(
                 state_automa.unsqueeze(0), state_grounding, 1.0
             )
-            state_automa = next_state_automa
-
-            state = torch.cat((state.unsqueeze(0), state_automa), dim=-1)
-
+            
+            state_automa =  torch.zeros(num_of_states).to(device)
+            state_automa[0] = 1.0
+            state = torch.cat((state.unsqueeze(0), state_automa.unsqueeze(0)), dim=-1)
+            
             state = state.squeeze()
 
         if method == "nrm":
-                curr_traj = []
-                curr_rew = []
-                curr_info = []
+            curr_traj = []
+            curr_rew = []
+            curr_info = []
 
-                curr_traj.append(raw_state)
-                curr_rew.append(reward)
-                curr_info.append(info)
-                # Push into replay buffers
-                # Positive trace if any timestep has positive label; zero trace if all labels are zero
-                
+            curr_traj.append(raw_state)
+            curr_rew.append(reward)
+            curr_info.append(info)
+            # Push into replay buffers
+            # Positive trace if any timestep has positive label; zero trace if all labels are zero
+
         while not (done or truncated):
             log_probs = []
             values = []
@@ -424,12 +429,6 @@ def recurrent_A2C(
                 action = dist.sample()
 
                 next_state, reward, done, truncated, info = env.step(action.item())
-
-                
-
-
-                
-                
 
                 if method == "rm":
                     state_dfa = torch.DoubleTensor(next_state[0]).to(device)
@@ -458,24 +457,44 @@ def recurrent_A2C(
                         out, (h_0, c_0) = rnn(next_state.unsqueeze(0), h_0, c_0)
                         next_state = out
                     elif method == "nrm":
-                        state_grounding = grounder.classifier(raw_state.unsqueeze(0))
+                        # 1. Stop Gradients (Prevent Reward Hacking)
+                        with torch.no_grad():
+                            if reward != 0:
+                                # 2. Classifier runs in Float (Fast)
+                                # Input: [1, C, H, W] -> Output: [1, Num_Symbols]
+                                state_grounding = grounder.classifier(
+                                    raw_state.unsqueeze(0).double()
+                                )
 
-                        next_state_automa, reward_automa = grounder.deepAutoma.step(
-                            state_automa, state_grounding, 1.0
-                        )
-                        state_automa = next_state_automa
+                                # 3. Automaton runs in Double (Precise) + Batch Dimension
+                                # Input: [1, 50] (Double) and [1, 5] (Double)
+                                next_state_automa, reward_automa = grounder.deepAutoma.step(
+                                    state_automa.unsqueeze(0).double(), 
+                                    state_grounding.double(), 
+                                    1.0
+                                )
+                                
+                                # 4. Squeeze back to 1D for storage
+                                # Shape: [1, 50] -> [50]
+                                state_automa = next_state_automa.squeeze(0)
 
+                                curr_traj.append(raw_state)
+                                curr_rew.append(reward)
+                                curr_info.append(info)
+                            
+                            else:
+                                # If no reward event, state remains the same
+                                next_state_automa = state_automa.unsqueeze(0)
+
+                        # 5. Concatenate for Policy (Actor-Critic)
+                        # We unsqueeze both to ensure they align: [1, 16] + [1, 50] -> [1, 66]
                         next_state = torch.cat(
-                            (next_state.unsqueeze(0), next_state_automa), dim=-1
+                            (next_state.unsqueeze(0), state_automa.unsqueeze(0)), dim=-1
                         )
-                        next_state = state.squeeze()
+                        next_state = next_state.squeeze()
 
-                        curr_traj.append(raw_state)
-                        curr_rew.append(reward)
-                        curr_info.append(info)
-                        
-                        
-                
+                         
+
                 state = next_state
 
                 # now we store the values
@@ -489,7 +508,7 @@ def recurrent_A2C(
 
                 # storing the reward retrived from the enbv
                 reward = float(reward)
-                
+
                 episode_rewards.append(reward)
                 reward = np.expand_dims(reward, axis=0)
                 reward = np.expand_dims(reward, axis=0)
@@ -523,7 +542,7 @@ def recurrent_A2C(
             advantage_cat = torch.cat((advantage_cat, advantage), 0)
 
             torch.cuda.empty_cache()
-        
+
         # EPISODIO FINITO
         episode_idx += 1
         all_mean_rewards.append(np.sum(np.array(episode_rewards)))
@@ -542,10 +561,8 @@ def recurrent_A2C(
                 automa_implementation="logic_circuit",
             )
 
-
-            
             sequence_accuracy.append(acc)
-            #print(sequence_accuracy)
+            # print(sequence_accuracy)
             with open(
                 path + "/sequence_classification_accuracy_" + str(experiment) + ".txt",
                 "a",
@@ -554,7 +571,7 @@ def recurrent_A2C(
             if env.state_type == "symbol":
                 acc, _ = grounder.eval_image_classification()
             else:
-                
+
                 acc = 0
             image_accuracy.append(acc)
             with open(
@@ -571,8 +588,8 @@ def recurrent_A2C(
             info_traj.append(curr_info)
 
             # Positive buffer if any timestep has label == 1; otherwise (only 0 and/or -1) goes to non-positive buffer
-            #print(f"Current info : {curr_info}")
-            #print(f"Reward : {curr_rew}")
+            # print(f"Current info : {curr_info}")
+            # print(f"Reward : {curr_rew}")
             if any(lbl == pos_label for lbl in curr_info):
                 positive_buffer.add(curr_traj, curr_info)
 
@@ -600,39 +617,58 @@ def recurrent_A2C(
 
             # ... inside the episode loop ...
             if episode_idx % TT_grounder == 0:
-                target_batch = target_batch_grounder # 128
-                half = target_batch // 2
-                
-                # CRITICAL FIX 1: Check if we actually have positive samples
-                if len(positive_buffer) < 5: 
-                    print(f"Skipping Grounder Training: Not enough positive traces yet ({len(positive_buffer)})")
+                # 1. INCREASE SAMPLE POOL SIZE
+                # We need a large history (2048) to ensure diversity,
+                # even though we train in small batches (64).
+                target_sample_size = target_batch_grounder
+
+                total_data = len(positive_buffer) + len(nonpos_buffer)
+                if total_data < target_sample_size:
+                    print(f"Buffer building... {total_data}/{target_sample_size}")
+                    continue
+
+                # 2. BALANCED SAMPLING STRATEGY
+                # Try to force 50% Positive (Items) and 50% Negative (Empty)
+                n_pos = target_sample_size // 2
+                n_neg = target_sample_size - n_pos
+
+                # Handle cases where we don't have enough positive samples yet
+                current_pos_len = len(positive_buffer)
+                if current_pos_len < n_pos:
+                    # Take all positives we have
+                    pos_samples = positive_buffer.sample(current_pos_len)
+                    # Fill the rest with negatives to maintain total size
+                    n_neg += n_pos - current_pos_len
                 else:
-                    # We have data!
-                    pos_samples = positive_buffer.sample(half)
-                    # Fill the rest with negative samples
-                    remaining_slots = target_batch - len(pos_samples)
-                    zero_samples = nonpos_buffer.sample(remaining_slots)
-                    
-                    sampled = pos_samples + zero_samples
-                    
-                    # CRITICAL FIX 2: Ensure we have a healthy mix
-                    if len(sampled) >= 64: 
-                        bat_traj = [traj for (traj, labels) in sampled]
-                        bat_labels = [labels for (traj, labels) in sampled]
-                        
-                        grounder.temperature = 1.0 
-                        grounder.set_dataset(bat_traj, bat_labels)
-                        grounder.train_symbol_grounding(grounder_epochs, batch_size=16, env=env)
-                
+                    # We have plenty, take the requested 50%
+                    pos_samples = positive_buffer.sample(n_pos)
+
+                zero_samples = nonpos_buffer.sample(n_neg)
+                sampled = pos_samples + zero_samples
+
+                # 3. TRAIN WITH MINI-BATCHES
+                if len(sampled) >= 64:
+                    bat_traj = [traj for (traj, labels) in sampled]
+                    bat_labels = [labels for (traj, labels) in sampled]
+
+                    # Optional: Reset temperature if it got too low
+                    if grounder.temperature < 0.5:
+                        grounder.temperature = 1.0
+
+                    # Pass the large balanced pool (2048 items)
+                    grounder.set_dataset(bat_traj, bat_labels)
+
+                    # CRITICAL: Train with Mini-Batch size 64 (not 16, not Full Batch)
+                    grounder.train_symbol_grounding(
+                        grounder_epochs, batch_size=64, env=env
+                    )
 
                 image_traj = []
                 rew_traj = []
                 info_traj = []
                 sum_rew_traj = []
                 grounder.eval_symbol_grounding(env=env)
-            
-            
-        
+
         if episode_idx % TTT == 0 and len(all_mean_rewards) >= 100:
             ## plot rewards
             plt.plot(
@@ -645,11 +681,9 @@ def recurrent_A2C(
             plt.clf()
             plt.close()
 
-            #plot the accuracies for nrm
+            # plot the accuracies for nrm
             if method == "nrm":
-                plt.plot(
-                    [i for i in range(len(sequence_accuracy))], sequence_accuracy
-                )
+                plt.plot([i for i in range(len(sequence_accuracy))], sequence_accuracy)
                 plt.xlabel("episode")
                 plt.ylabel("sequence classification accuracy")
                 plt.savefig(
@@ -669,10 +703,6 @@ def recurrent_A2C(
 
             plot_smoothed_sequence_classification_accuracy()
 
-            
-
-
-
         # else:
         ep_reward = all_mean_rewards[-1]
         f = open(path + "/train_rewards_" + str(experiment) + ".txt", "a")
@@ -688,16 +718,15 @@ def recurrent_A2C(
         if len(all_mean_rewards) >= 100 and all_mean_rewards_averaged[-1] == 100:
             episode_idx = max_episodes
 
-        #exit()
+        # exit()
     # save the cnn state dict in case of feature extraction
     if feature_extraction:
         torch.save(
             cnn.state_dict(), path + "/cnn_state_dict_" + str(experiment) + ".pt"
         )
 
-    
-        #save for future use in a pickle and in case in exists, append it
+        # save for future use in a pickle and in case in exists, append it
     os.makedirs(path + "/traces/", exist_ok=True)  # Create it if it doesn't exist
-    with open(f"{path}/traces/exp{str(experiment)}.pkl", 'wb') as outp:
+    with open(f"{path}/traces/exp{str(experiment)}.pkl", "wb") as outp:
         print(f"Saving the traces in {path}/traces/exp{str(experiment)}.pkl")
-        #pickle.dump(saved_traces, outp, pickle.HIGHEST_PROTOCOL)
+        # pickle.dump(saved_traces, outp, pickle.HIGHEST_PROTOCOL)
