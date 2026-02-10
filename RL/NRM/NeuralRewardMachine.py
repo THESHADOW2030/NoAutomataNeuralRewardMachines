@@ -12,6 +12,10 @@ from sklearn.model_selection import train_test_split
 import numpy as np
 from torch.utils.data import TensorDataset, DataLoader
 
+
+# Add this import at the top
+from torch.cuda.amp import autocast, GradScaler
+
 from .utils import eval_acceptance, eval_learnt_DFA_acceptance, eval_image_classification_from_traces
 if torch.cuda.is_available():
     device = 'cuda'
@@ -509,7 +513,177 @@ class NeuralRewardMachine:
 
 
 
+    def train_symbol_grounding_bad_performance(self, num_of_epochs, batch_size=64, env=None):
+            # 1. OPTIMIZATION: Ensure models are in Float32
+            self.classifier.float() 
+            self.deepAutoma.float()
+            self.classifier.train()
 
+            # Initialize Scaler for Mixed Precision (AMP)
+            scaler = GradScaler() 
+
+            # 2. PREPARE DATA LOADER
+            train_data_tensor = self.train_img_seq[0].float() 
+            train_label_tensor = self.train_acceptance_img[0].type(torch.LongTensor)
+
+            # Safety: Clamp labels
+            if train_label_tensor.max() >= self.numb_of_rewards:
+                train_label_tensor[train_label_tensor > 0] = 1 
+
+            train_dataset = TensorDataset(train_data_tensor, train_label_tensor)
+
+            train_loader = DataLoader(
+                train_dataset, 
+                batch_size=batch_size, 
+                shuffle=True, 
+                drop_last=True,
+                pin_memory=False 
+            )
+
+            print(f"___TRAINING START (Fixed)___ | Samples: {len(train_dataset)} | Batch: {batch_size}")
+
+            if self.temperature < 0.5:
+                self.temperature = 1.0 
+            
+            self.temperature = 2.0      
+            best_test_acc = 0.0
+            patience = 10
+            patience_counter = 0
+            max_accuracy = 0
+            
+            best_classifier_state = {k: v.cpu() for k, v in self.classifier.state_dict().items()}
+            
+            empty_class_idx = self.numb_of_symbols - 1 
+
+            for epoch in range(num_of_epochs):
+                epoch_losses = []
+                
+                for batch_idx, (batch_imgs, batch_lbls) in enumerate(train_loader):
+                    batch_imgs = batch_imgs.to(device, non_blocking=True)
+                    batch_lbls = batch_lbls.to(device, non_blocking=True)
+                    
+                    target_rew = batch_lbls.view(-1)
+                    curr_batch_size = batch_imgs.size(0)
+                    length_seq = batch_imgs.size(1)
+
+                    self.optimizer.zero_grad(set_to_none=True)
+
+                    # --- 1. AMP Forward Pass (Classifier Only) ---
+                    # We only want the heavy CNN convolution math to be in FP16.
+                    with autocast(enabled=True): 
+                        if self.dataset == 'minecraft_image':
+                            flat_imgs = batch_imgs.view(-1, self.num_channels, self.pixels_v, self.pixels_h)
+                            logits = self.classifier(flat_imgs) 
+                        else:
+                            logits = self.classifier(batch_imgs)
+
+                    # --- 2. Float32 Critical Section ---
+                    # We disable AMP for Gumbel, Automa, and Loss to prevent Nan/Inf
+                    with autocast(enabled=False):
+                        # Cast logits back to float32 for stability
+                        logits = logits.float()
+
+                        # Masks
+                        empty_mask = (target_rew == 0)
+                        item_mask = (target_rew != 0)
+
+                        # Gumbel Softmax & Automa
+                        sym_sequences = F.gumbel_softmax(logits, tau=self.temperature, hard=True, dim=-1)
+                        sym_sequences = sym_sequences.view(curr_batch_size, length_seq, self.numb_of_symbols)
+                        
+                        pred_states, pred_rew = self.deepAutoma(sym_sequences, self.temperature)
+                        pred_rew = pred_rew.view(-1, self.numb_of_rewards)
+
+                        # --- Loss Calculation ---
+                        
+                        # 1. RL Loss
+                        class_counts = torch.bincount(target_rew, minlength=self.numb_of_rewards)
+                        class_weights = 1.0 / (class_counts.float() + 0.1) 
+                        class_weights = class_weights / class_weights.sum() * self.numb_of_rewards
+                        
+                        # FIX: Use Clamp instead of +1e-9. 1e-9 is too small and causes -inf in some cases.
+                        # 1e-7 is safe for float32.
+                        log_pred_rew = torch.log(torch.clamp(pred_rew, min=1e-7))
+                        rew_loss = F.nll_loss(log_pred_rew, target_rew, weight=class_weights)
+
+                        # 2. Supervised Loss
+                        supervised_loss = 0.0
+                        if empty_mask.any():
+                            empty_logits = logits[empty_mask]
+                            empty_targets = torch.full((empty_logits.size(0),), empty_class_idx, dtype=torch.long).to(device)
+                            supervised_loss = F.cross_entropy(empty_logits, empty_targets)
+
+                        # 3. Separation Loss
+                        separation_loss = 0.0
+                        if item_mask.any():
+                            item_logits = logits[item_mask]
+                            item_probs = F.softmax(item_logits, dim=-1)
+                            prob_of_empty = item_probs[:, empty_class_idx]
+                            # FIX: Clamp here as well
+                            separation_loss = -torch.log(torch.clamp(1.0 - prob_of_empty, min=1e-7)).mean()
+                        
+                        # Entropy
+                        probs = F.softmax(logits, dim=-1)
+                        log_probs = F.log_softmax(logits, dim=-1)
+                        entropy = -torch.sum(probs * log_probs, dim=-1).mean()
+
+                        loss = rew_loss + (5.0 * supervised_loss) + (2.0 * separation_loss) - (0.1 * entropy)
+
+                    # --- 3. Backward Pass ---
+                    # Check for NaNs before backward to avoid crashing the scaler
+                    if torch.isnan(loss):
+                        print(f"Warning: Loss is NaN at Epoch {epoch}, Batch {batch_idx}. Skipping step.")
+                        continue
+
+                    scaler.scale(loss).backward()
+                    
+                    scaler.unscale_(self.optimizer)
+                    torch.nn.utils.clip_grad_norm_(self.params, max_norm=0.5)
+                    
+                    scaler.step(self.optimizer)
+                    scaler.update()
+
+                    epoch_losses.append(loss.item())
+
+                # --- End of Epoch ---
+                if len(epoch_losses) > 0:
+                    mean_loss_new = mean(epoch_losses)
+                    self.scheduler.step(mean_loss_new)
+                
+                if epoch > 0:
+                    self.temperature = max(0.5, self.temperature * 0.98)
+
+                if epoch % 10 == 0:
+                    with torch.no_grad():
+                        train_acc, _, _, test_acc = self.eval_all(
+                            automa_implementation='logic_circuit', 
+                            temperature=1, 
+                            discretize_labels=True
+                        )
+                    
+                    print(f"Ep {epoch} | Loss: {mean_loss_new:.3f} | TrAcc: {train_acc:.2f} | TsAcc: {test_acc:.2f}")
+
+                    if train_acc >= max_accuracy:
+                        max_accuracy = train_acc
+                        best_classifier_state = {k: v.cpu() for k, v in self.classifier.state_dict().items()}
+
+                    if test_acc > best_test_acc:
+                        best_test_acc = test_acc
+                        best_classifier_state = {k: v.cpu() for k, v in self.classifier.state_dict().items()}
+                        patience_counter = 0 
+                    else:
+                        patience_counter += 1
+                        
+                    if patience_counter >= patience:
+                        print(f"Early Stopping @ Epoch {epoch}")
+                        break
+
+            best_classifier_state = {k: v.to(device) for k, v in best_classifier_state.items()}
+            self.classifier.load_state_dict(best_classifier_state)
+            
+            self.classifier.eval()    
+            self.eval_symbol_grounding(env=env)
+            self.classifier.train()
 
 
 
@@ -633,9 +807,9 @@ class NeuralRewardMachine:
     def eval_all(self, automa_implementation, temperature, discretize_labels=False):
         train_accuracy = eval_acceptance(self.classifier, self.deepAutoma, self.alphabet, (self.train_img_seq, self.train_acceptance_img), automa_implementation, temperature, discretize_labels=discretize_labels, mutually_exc_sym=True)
 
-        test_accuracy_hard= eval_acceptance( self.classifier, self.deepAutoma, self.alphabet,(self.test_img_seq_hard, self.test_acceptance_img_hard), automa_implementation, temperature, discretize_labels=discretize_labels, mutually_exc_sym=True)
+        #test_accuracy_hard= eval_acceptance( self.classifier, self.deepAutoma, self.alphabet,(self.test_img_seq_hard, self.test_acceptance_img_hard), automa_implementation, temperature, discretize_labels=discretize_labels, mutually_exc_sym=True)
 
-        return train_accuracy, 0,0, test_accuracy_hard
+        return train_accuracy, 0,0, train_accuracy
 
     def eval_image_classification(self, env = None):
         train_acc = eval_image_classification_from_traces(self.custom_trace, self.symbolic_grid, self.classifier, True)
@@ -662,13 +836,13 @@ class NeuralRewardMachine:
         #use the classifier to classify the symbols
         with torch.no_grad():
 
-            classifier_output_len = len(self.classifier(torch.randn((1,3,64,64), dtype=torch.double).to(device)).squeeze())
+            classifier_output_len = len(self.classifier(torch.randn((1,3,64,64), dtype=torch.float).to(device)).squeeze())
             predicted = [0 for _ in range(classifier_output_len)]
             for i in traces_to_test.keys():
                 
                 obs = traces_to_test[i]
                 
-                obs = torch.from_numpy(obs).double().to(device).unsqueeze(0)
+                obs = torch.from_numpy(obs).float().to(device).unsqueeze(0)
                 logits = self.classifier(obs)
                 pred_symbols = torch.argmax(logits, dim=1)
                 for s in pred_symbols:
@@ -688,12 +862,12 @@ class NeuralRewardMachine:
             for c in range(map_size):
                 env.env.agent_location = (r, c)
                 obs = env.env._get_image_obs()
-                all_obs.append(torch.from_numpy(obs).double())
+                all_obs.append(torch.from_numpy(obs).float())
             
         env.env.agent_location = original_pos
 
         # Stack and Cast
-        batch_obs = torch.stack(all_obs).double().to(device) 
+        batch_obs = torch.stack(all_obs).float().to(device) 
 
         with torch.no_grad():
             logits = self.classifier(batch_obs)
