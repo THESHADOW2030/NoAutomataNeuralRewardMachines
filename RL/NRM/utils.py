@@ -105,14 +105,92 @@ def transacc2pythomata(trans, acc, action_alphabet):
     return automaton
 
 
-def eval_acceptance(classifier, automa, alphabet, dataset, automa_implementation='dfa', temperature = 1.0, discretize_labels= False, mutually_exc_sym=True):
+import torch
+import torch.nn.functional as F
+
+
+
+def eval_acceptance(classifier, automa, alphabet, dataset, automa_implementation='dfa', temperature=1.0, discretize_labels=False, mutually_exc_sym=True):
+    total = 0
+    correct = 0
+    test_loss = 0.0  # Make sure this is a float
+    
+    classifier.eval()
+    if type(alphabet) == list:
+        numb_of_symbols = len(alphabet)
+    else:
+        numb_of_symbols = alphabet
+        
+    with torch.no_grad():
+        for i in range(len(dataset[0])):
+            image_sequences = dataset[0][i].to(device)
+            labels = dataset[1][i].to(device)
+            batch_size = image_sequences.size()[0]
+            length_seq = image_sequences.size()[1]
+            num_channels = image_sequences.size()[2]
+
+            # 1. Get Logits from Classifier
+            if len(image_sequences.size()) > 3:
+                pixels_v = image_sequences.size()[3]
+                pixels_h = image_sequences.size()[4]
+                logits = classifier(image_sequences.view(-1, num_channels, pixels_v, pixels_h))
+            else:
+                logits = classifier(image_sequences.view(-1, num_channels).float())
+
+            # ---------------------------------------------------------
+            # !!! THE FIX: CONVERT LOGITS TO ONE-HOT / PROBABILITIES !!!
+            # ---------------------------------------------------------
+            predicted_symbol_indices = torch.argmax(logits, dim=-1)
+            
+            # Create One-Hot encoding (Batch*SeqLen, NumSymbols)
+            symbols = torch.zeros_like(logits)
+            symbols.scatter_(1, predicted_symbol_indices.unsqueeze(1), 1.0)
+            # ---------------------------------------------------------
+
+            sym_sequences = symbols.view(batch_size, length_seq, numb_of_symbols)
+
+            if automa_implementation == 'lstm':
+                accepted = automa(sym_sequences)
+                accepted = accepted[-1] # Assuming this gives raw logits/scores
+                
+                # --- CALCULATE LOSS ---
+                # Check shapes: if accepted is 1D but labels expects batched, you might need unsqueeze(0)
+                loss = F.cross_entropy(accepted.view(-1, accepted.shape[-1]), labels.view(-1))
+                test_loss += loss.item() * labels.size(0)
+
+                output = torch.argmax(accepted).item() # Note: .item() implies batch size 1 here
+                
+            elif automa_implementation == 'logic_circuit':
+                pred_states, pred_rew = automa(sym_sequences, temperature)
+                num_out = pred_rew.size()[-1]
+                pred_rew = pred_rew.view(-1, num_out)
+                labels = labels.view(-1)
+                
+                # --- CALCULATE LOSS ---
+                loss = F.cross_entropy(pred_rew, labels)
+                test_loss += loss.item() * labels.size(0)
+               
+                output = torch.argmax(pred_rew, dim=-1).to(device)
+              
+            else:
+                print("INVALID AUTOMA IMPLEMENTATION: ", automa_implementation)
+        
+            total += labels.size()[0]
+            correct += (output == labels).sum().item()
+            
+        test_accuracy = 100. * correct / float(total)
+        average_test_loss = test_loss / float(total) # Divide by total items for the mean loss
+        
+    return test_accuracy, average_test_loss
+
+def eval_acceptance_old(classifier, automa, alphabet, dataset, automa_implementation='dfa', temperature = 1.0, discretize_labels= False, mutually_exc_sym=True):
     #automa implementation =
     #   - 'dfa' use the perfect dfa given
     #   - 'lstm' use the lstm model
     #   - 'logic_circuit' use the fuzzy automaton
     total = 0
     correct = 0
-    test_loss = 0
+    test_loss = 0.0
     classifier.eval()
     if type(alphabet) == list:
         numb_of_symbols = len(alphabet)
@@ -132,7 +210,7 @@ def eval_acceptance(classifier, automa, alphabet, dataset, automa_implementation
                 pixels_h = image_sequences.size()[4]
                 logits = classifier(image_sequences.view(-1, num_channels, pixels_v, pixels_h))
             else:
-                logits = classifier(image_sequences.view(-1, num_channels).double())
+                logits = classifier(image_sequences.view(-1, num_channels).float())
 
             # ---------------------------------------------------------
             # !!! THE FIX: CONVERT LOGITS TO ONE-HOT / PROBABILITIES !!!

@@ -9,7 +9,7 @@ from plot import plot
 
 from SymGroundMultiTask.ltl_samplers import SingleFormulaSampler
 from SymGroundMultiTask.utils import make_env
-
+import random
 from SymGroundMultiTask.utils.ltl_translation import ltl_str2ast
 
 # flags
@@ -24,7 +24,7 @@ absl.flags.DEFINE_string(
 absl.flags.DEFINE_string(
     "LOG_DIR", "Results/", "path where to save the results, default='Results/'"
 )
-absl.flags.DEFINE_integer("NUM_EXPERIMENTS", 5, "num of runs for each test, default= 5")
+absl.flags.DEFINE_integer("NUM_EXPERIMENTS", 4, "num of runs for each test, default= 5")
 absl.flags.DEFINE_integer("NUM_STATES", None, "num of states for the NRM, default= 30")
 absl.flags.DEFINE_integer("NUM_SYMBOLS", None, "num of symbols for the NRM, default= 5")
 absl.flags.DEFINE_integer("NUM_HIDDEN_SIZE_RNN", 50, "hidden size for the RNN, default= 50")
@@ -68,14 +68,16 @@ def launch_experiments(path, formula, experiment, env_type, method):
     
 
     
+    #randomize the seed
 
+    seed = random.randint(0, 1000)
 
 
     env = make_env(
         env_key="GridWorld-12-v0",
         progression_mode="full",
         ltl_sampler="SingleFormula",
-        seed=2030,
+        seed=seed,
         obs_size=(64, 64),
         formula_old=formula,
         use_dfa_state=use_dfa_state,
@@ -115,6 +117,8 @@ def launch_experiments(path, formula, experiment, env_type, method):
         num_of_states=FLAGS.NUM_STATES,
         num_of_symbols=FLAGS.NUM_SYMBOLS,
         hidden_size_rnn=FLAGS.NUM_HIDDEN_SIZE_RNN,
+        formula_name=formula[2],
+
     )
 
 
@@ -122,11 +126,11 @@ def main(argv):
 
     if not os.path.isdir(FLAGS.LOG_DIR):
         os.makedirs(FLAGS.LOG_DIR)
-    for experiment in range(FLAGS.NUM_EXPERIMENTS):
+    for experiment in range(1, FLAGS.NUM_EXPERIMENTS + 1):
         for formula_idx, formula in enumerate(formulas):
         
             print(f"Experiment {experiment} on formula {formula[2]}")
-            path = FLAGS.LOG_DIR + str(formula[2]) + f"/{FLAGS.METHOD}_{FLAGS.ENV}" + f"/NUM_STATES_{FLAGS.NUM_STATES}_NUM_SYMBOLS_{FLAGS.NUM_SYMBOLS}/"
+            path = FLAGS.LOG_DIR + str(formula[2]) + f"/{FLAGS.METHOD}_{FLAGS.ENV}" + f"/NUM_STATES_{FLAGS.NUM_STATES}_NUM_SYMBOLS_{FLAGS.NUM_SYMBOLS}" + f"/exp{experiment}"
 
             launch_experiments(path, formula, experiment, FLAGS.ENV, FLAGS.METHOD)
         plot(path, FLAGS.NUM_EXPERIMENTS, formula, 100)

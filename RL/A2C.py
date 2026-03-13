@@ -24,6 +24,65 @@ torch.autograd.set_detect_anomaly(True)
 import os
 import pickle
 
+class TraceReplayBuffer_old:
+    def __init__(self, capacity=2000):
+        self.capacity = capacity
+        self.data = deque(maxlen=capacity)
+
+    def add(self, traj, labels, loss = 0):
+        self.data.append((traj, labels))    #add ((traj, labels), loss). Poi ordianre in modo decrescente in base alla loss e poi prendere le prime k loss piu alte (principalmente le prime) e addestrare su quello
+
+    def __len__(self):
+        return len(self.data)
+
+    def sample(self, n):   #modificare in modo che gli elementi samplati spariscano dal buffer
+        if len(self.data) == 0:
+            return []
+        idxs = np.random.choice(
+            len(self.data), size=min(n, len(self.data)), replace=False
+        )
+        return [self.data[i] for i in idxs]
+
+
+import bisect
+import itertools
+
+class TraceReplayBuffer:
+    def __init__(self, capacity=2000):
+        self.capacity = capacity
+        self.data = []
+        # Tie-breaker to prevent Python from comparing 'traj' or 'labels' 
+        # (which throws errors if they are numpy arrays or tensors) when losses are identical.
+        self.counter = itertools.count() 
+
+    def add(self, traj, labels, loss=0):
+        count = next(self.counter)
+        
+        # bisect.insort maintains the list in ascending order based on the first tuple element (loss).
+        # We insert (loss, count, traj, labels).
+        bisect.insort(self.data, (loss, count, traj, labels))
+
+        # Enforce capacity by dropping the LOWEST loss element (at index 0).
+        if len(self.data) > self.capacity:
+            self.data.pop(0)
+
+    def __len__(self):
+        return len(self.data)
+
+    def sample(self, n):
+        """Samples the `n` elements with the highest loss and REMOVES them from the buffer."""
+        n = min(n, len(self.data))
+        if n == 0:
+            return []
+
+        sampled = []
+        for _ in range(n):
+            # pop() removes and returns the last element in O(1) time.
+            # Since the list is sorted ascending, the last elements have the HIGHEST loss.
+            loss, _, traj, labels = self.data.pop()
+            sampled.append((traj, labels))
+
+        return sampled
 
 # max number of episodes
 max_episodes = 10000  # 10000
@@ -172,6 +231,7 @@ def recurrent_A2C(
     num_of_states=None,
     num_of_symbols=None,
     hidden_size_rnn=50,
+    formula_name=""
 ):
 
     # recurrency =
@@ -180,6 +240,28 @@ def recurrent_A2C(
     #       - 'rm'    (reward machines)
 
     #################### reinitialize files if they exist or create them
+
+
+    task_number = int(formula_name.split(" ")[0][-2])
+    if task_number == 1:
+        max_traces = 2
+    elif task_number == 2:
+        max_traces = 3
+    elif task_number == 3:
+        max_traces = 2
+    elif task_number == 4:
+        max_traces = 3
+    elif task_number == 5:
+        max_traces = 2
+    elif task_number == 6:
+        max_traces = 2
+    elif task_number == 7:
+        max_traces = 2
+    elif task_number == 8:
+        max_traces = 2
+    else:
+        raise ValueError("Invalid task number in formula name. Update the code to handle this new task.")
+    
 
     f = open(path + "/train_rewards_" + str(experiment) + ".txt", "w")
     f.close()
@@ -274,24 +356,7 @@ def recurrent_A2C(
         sequence_accuracy = []
         image_accuracy = []
 
-        class TraceReplayBuffer:
-            def __init__(self, capacity=2000):
-                self.capacity = capacity
-                self.data = deque(maxlen=capacity)
-
-            def add(self, traj, labels):
-                self.data.append((traj, labels))
-
-            def __len__(self):
-                return len(self.data)
-
-            def sample(self, n):
-                if len(self.data) == 0:
-                    return []
-                idxs = np.random.choice(
-                    len(self.data), size=min(n, len(self.data)), replace=False
-                )
-                return [self.data[i] for i in idxs]
+        
 
         positive_buffer = TraceReplayBuffer(capacity=50000)
         nonpos_buffer = TraceReplayBuffer(capacity=50000)
@@ -308,6 +373,9 @@ def recurrent_A2C(
     log_probs_cat = torch.tensor([]).to(device)
     all_mean_rewards = []
     all_mean_rewards_averaged = []
+
+
+
 
     for episode_idx in tqdm(
         range(max_episodes), desc="Training episodes", unit="episode"
@@ -492,13 +560,15 @@ def recurrent_A2C(
             curr_info_t = torch.LongTensor(curr_info).unsqueeze(0)
 
             # Use logic_circuit for speed
-            acc = eval_acceptance(
+            acc, loss = eval_acceptance(      #tirare fuori la loss da qui
                 grounder.classifier,
                 grounder.deepAutoma,
                 num_of_symbols,
                 ([curr_traj_t], [curr_info_t]),
                 automa_implementation="logic_circuit",
             )
+
+
 
             # ... appending to files ...
             sequence_accuracy.append(acc)
@@ -515,23 +585,23 @@ def recurrent_A2C(
             # --- FIX STARTS HERE ---
             
             # 1. Pad the Trajectory (You already had this)
-            curr_traj = pad_list(curr_traj, env.max_num_steps + 1)
+            curr_traj = pad_list(curr_traj, max_traces + 1) #it was env.max_num_steps + 1 before, but that is too long and causes memory issues. We only need to pad to the length of the longest trace for this task, which is task_number + 1. For example, if task_number is 3, the longest trace has 4 states (including initial), so we pad to length 4. This prevents excessive padding and memory usage while ensuring all traces are the same length for batching.
             
             # 2. CRITICAL: Pad the Info/Labels (You were missing this)
             # Without this, episodes of different lengths create a ragged list,
             # causing the "expected sequence of length..." error in torch.LongTensor
-            curr_info = pad_list(curr_info, env.max_num_steps + 1)
+            curr_info = pad_list(curr_info, max_traces + 1)
             
             # 3. Optional: Pad rewards if used elsewhere, to maintain consistency
-            curr_rew = pad_list(curr_rew, env.max_num_steps + 1)
+            curr_rew = pad_list(curr_rew, max_traces + 1)
 
-            # --- FIX ENDS HERE ---
+            
 
             # Add to buffers
             if any(lbl == pos_label for lbl in curr_info):
-                positive_buffer.add(curr_traj, curr_info)
+                positive_buffer.add(curr_traj, curr_info)       #aggiungere la loss qui
             else:
-                nonpos_buffer.add(curr_traj, curr_info)
+                nonpos_buffer.add(curr_traj, curr_info)         #aggiungere la loss qui
 
         # Policy Update
         if episode_idx % TT_policy == 0:
@@ -641,18 +711,26 @@ def recurrent_A2C(
 
 
         # exit()
-    dfa = grounder.deepAutoma.net2dfa(min_temp=0.00001, name_automata=path + "/" + "final_dfa_exp" + str(experiment))
-    dfa.to_graphviz().render(path + "/" + "final_dfa_exp" + str(experiment) + ".dot")
-    with open(path + "/" + "final_dfa_exp" + str(experiment) + ".pkl", 'wb') as outp:
-        pickle.dump(dfa, outp, pickle.HIGHEST_PROTOCOL)
-    # save the cnn state dict in case of feature extraction
+    if method == "nrm":
+        with open(path + "/DeepAutoma_Before_Minimization_exp" + str(experiment) + ".pkl", 'wb') as outp:
+            pickle.dump(grounder.deepAutoma, outp, pickle.HIGHEST_PROTOCOL)
+
+            with open (path + "/buffer_exp" + str(experiment) + ".pkl", 'wb') as outp:
+                pickle.dump({
+                    "positive_buffer": positive_buffer,
+                    "nonpos_buffer": nonpos_buffer
+                }, outp, pickle.HIGHEST_PROTOCOL)
+
+            with open(path + "/DeepAutoma_Symbol_Grounding_Classifier_exp" + str(experiment) + ".pkl", 'wb') as outp:
+                pickle.dump(grounder.classifier, outp, pickle.HIGHEST_PROTOCOL)
+                
+
+
+      # save the cnn state dict in case of feature extraction
     if feature_extraction:
         torch.save(
             cnn.state_dict(), path + "/cnn_state_dict_" + str(experiment) + ".pt"
         )
 
         # save for future use in a pickle and in case in exists, append it
-    os.makedirs(path + "/traces/", exist_ok=True)  # Create it if it doesn't exist
-    with open(f"{path}/traces/exp{str(experiment)}.pkl", "wb") as outp:
-        print(f"Saving the traces in {path}/traces/exp{str(experiment)}.pkl")
-        # pickle.dump(saved_traces, outp, pickle.HIGHEST_PROTOCOL)
+    

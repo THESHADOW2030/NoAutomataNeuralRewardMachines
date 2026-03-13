@@ -433,8 +433,8 @@ class NeuralRewardMachine:
 #                Normalize weights so they sum to 1 (or len(classes))
                 class_weights = class_weights / class_weights.sum() * self.numb_of_rewards
                 rew_loss = F.nll_loss(torch.log(pred_rew + 1e-9), target_rew, weight=class_weights)
-
-                # 2. Supervised "Empty" Loss (CORRECTED)
+                """
+                # 2. Supervised "Empty" Loss 
                 if empty_mask.any():
                     empty_logits = logits[empty_mask]
                     
@@ -454,14 +454,29 @@ class NeuralRewardMachine:
                     # We penalize the probability of the Empty Class for items
                     prob_of_empty = item_probs[:, empty_class_idx]
                     separation_loss = -torch.log(1.0 - prob_of_empty + 1e-9).mean()
+
+
+                    # #let's if this work 
+
+                    # # Diversity Loss: Encourage the average prediction over the batch to be distributed
+                    # # (Prevents all items from being mapped to symbol 'D')
+                    # avg_probs = item_probs.mean(dim=0)
+                    # diversity_loss = torch.sum(avg_probs * torch.log(avg_probs + 1e-9)) # Negative entropy of means
+
+
+
+
+
+
+                    
                 else:
                     separation_loss = 0.0
-                
+                """
                 entropy = -torch.sum(F.softmax(logits, dim=-1) * F.log_softmax(logits, dim=-1), dim=-1).mean()
 
                 # TOTAL LOSS
                 # We trust the Supervision (Empty detection) the most
-                loss = rew_loss + (5.0 * supervised_loss) + (2.0 * separation_loss) - (0.1 * entropy)
+                loss = rew_loss  - (0.1 * entropy) # + (5.0 * supervised_loss) + (2.0 * separation_loss) #+ (2.0 * diversity_loss)
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(self.params, max_norm=0.5)
                 self.optimizer.step()
@@ -475,7 +490,7 @@ class NeuralRewardMachine:
             if epoch > 0:
                 self.temperature = max(0.5, self.temperature * 0.98) # Slower decay
 
-            if epoch % 5 == 0:
+            if epoch % 20 == 0:     #slowdown 
                 train_acc, _, _, test_acc = self.eval_all(automa_implementation='logic_circuit', temperature=1, discretize_labels=True)
                 print(f"Epoch {epoch} | Loss: {mean_loss_new:.4f} | Temp: {self.temperature:.4f} | Train Acc: {train_acc:.2f} | Test Acc: {test_acc:.2f}")
 
@@ -805,7 +820,7 @@ class NeuralRewardMachine:
         test_file_dfa.write("{}\n".format(test_accuracy))
 
     def eval_all(self, automa_implementation, temperature, discretize_labels=False):
-        train_accuracy = eval_acceptance(self.classifier, self.deepAutoma, self.alphabet, (self.train_img_seq, self.train_acceptance_img), automa_implementation, temperature, discretize_labels=discretize_labels, mutually_exc_sym=True)
+        train_accuracy, loss = eval_acceptance(self.classifier, self.deepAutoma, self.alphabet, (self.train_img_seq, self.train_acceptance_img), automa_implementation, temperature, discretize_labels=discretize_labels, mutually_exc_sym=True)
 
         #test_accuracy_hard= eval_acceptance( self.classifier, self.deepAutoma, self.alphabet,(self.test_img_seq_hard, self.test_acceptance_img_hard), automa_implementation, temperature, discretize_labels=discretize_labels, mutually_exc_sym=True)
 
@@ -917,3 +932,8 @@ class NeuralRewardMachine:
         print("------------------------------------\n")
         
         self.classifier.train()
+
+
+
+
+        
