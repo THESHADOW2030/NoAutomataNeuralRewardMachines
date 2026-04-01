@@ -1,2 +1,7 @@
-- prendere codice x la minimizzazione da https://github.com/KRLGroup/DeepSymbolicLearning4TemporalRules/blob/main/minimization.py DONE
+RNN:
+rnn_hidden_size = 150
 
+
+DeepDFA:        #ImageEnv
+S50S5
+S100S15

@@ -1,0 +1,2 @@
+CUDA_VISIBLE_DEVICES=2 python experiments.py --METHOD "nrm" --NUM_STATES 50 --NUM_SYMBOLS 5 --LOG_DIR "Results/" --ENV "image_env"
+CUDA_VISIBLE_DEVICES=2 python experiments.py --METHOD "nrm" --NUM_STATES 150 --NUM_SYMBOLS 20 --LOG_DIR "Results/" --ENV "image_env"

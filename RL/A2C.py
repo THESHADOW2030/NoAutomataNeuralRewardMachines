@@ -1,11 +1,9 @@
 import numpy as np
-
 import torch
 import torch.nn as nn
 import torch.optim as optim
 import matplotlib.pyplot as plt
 from statistics import mean
-
 from tqdm import tqdm
 
 from .NN_models import ActorCritic, RNN, Net
@@ -13,16 +11,16 @@ from .NRM.NeuralRewardMachine import NeuralRewardMachine
 from .NRM.utils import eval_acceptance
 
 from collections import deque
-import numpy as np
 import cv2
+import os
+import pickle
+import bisect
+import itertools
 
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
 print(device)
 torch.autograd.set_detect_anomaly(True)
-
-import os
-import pickle
 
 class TraceReplayBuffer_old:
     def __init__(self, capacity=2000):
@@ -30,12 +28,12 @@ class TraceReplayBuffer_old:
         self.data = deque(maxlen=capacity)
 
     def add(self, traj, labels, loss = 0):
-        self.data.append((traj, labels))    #add ((traj, labels), loss). Poi ordianre in modo decrescente in base alla loss e poi prendere le prime k loss piu alte (principalmente le prime) e addestrare su quello
+        self.data.append((traj, labels))
 
     def __len__(self):
         return len(self.data)
 
-    def sample(self, n):   #modificare in modo che gli elementi samplati spariscano dal buffer
+    def sample(self, n):
         if len(self.data) == 0:
             return []
         idxs = np.random.choice(
@@ -43,26 +41,15 @@ class TraceReplayBuffer_old:
         )
         return [self.data[i] for i in idxs]
 
-
-import bisect
-import itertools
-
 class TraceReplayBuffer:
     def __init__(self, capacity=2000):
         self.capacity = capacity
         self.data = []
-        # Tie-breaker to prevent Python from comparing 'traj' or 'labels' 
-        # (which throws errors if they are numpy arrays or tensors) when losses are identical.
         self.counter = itertools.count() 
 
     def add(self, traj, labels, loss=0):
         count = next(self.counter)
-        
-        # bisect.insort maintains the list in ascending order based on the first tuple element (loss).
-        # We insert (loss, count, traj, labels).
         bisect.insort(self.data, (loss, count, traj, labels))
-
-        # Enforce capacity by dropping the LOWEST loss element (at index 0).
         if len(self.data) > self.capacity:
             self.data.pop(0)
 
@@ -70,112 +57,57 @@ class TraceReplayBuffer:
         return len(self.data)
 
     def sample(self, n):
-        """Samples the `n` elements with the highest loss and REMOVES them from the buffer."""
         n = min(n, len(self.data))
         if n == 0:
             return []
-
         sampled = []
         for _ in range(n):
-            # pop() removes and returns the last element in O(1) time.
-            # Since the list is sorted ascending, the last elements have the HIGHEST loss.
             loss, _, traj, labels = self.data.pop()
             sampled.append((traj, labels))
-
         return sampled
 
-# max number of episodes
-max_episodes = 10000  # 10000
-
-
-# output of rnn
+# --- HYPERPARAMS ---
+max_episodes = 10000
 rnn_outputs = 5
-
-# layers of rnn
 num_layers = 2
-
-# hyper params:
-hidden_size = 120  # of a2c
-rnn_hidden_size = 50  # of rnn
-
-# slidind window
+hidden_size = 120
+rnn_hidden_size = 50
 slide_wind = 100
-
 lr = 0.0004
+
+# --- PPO SPECIFIC HYPERPARAMS ---
+ppo_epochs = 4            # Number of optimization epochs per batch
+clip_param = 0.2          # PPO clip parameter
+max_grad_norm = 0.5       # Gradient clipping
 
 # we train the policy every num_steps
 num_steps = 5
-TT_policy = 5
-TT_grounder = 100
-grounder_epochs = 100
-
-# we plot the graph every TTT episode
+TT_policy = 1  
+TT_grounder = 10 
+grounder_epochs = 150
 TTT = 10
-
-# --- OPTIMIZED HYPERPARAMS ---
-
-# 1. Update Policy frequently to fix the Critic quickly
-TT_policy = 1  # Was 5. Update every episode.
-
-# 2. Train Grounder frequently so the Agent adapts to changes
-TT_grounder = 10  # Was 50. Don't let the agent run blind for too long.
-
-# 3. Prevent Overfitting in the Grounder
-grounder_epochs = 150  # Was 100. Short bursts of learning are better.
-
-# 4. A2C Params (Standard)
-lr = 0.0007  # Slightly higher because batch size is effectively smaller now
-num_steps = 5  # Keep this (standard n-step return)
-hidden_size = 120  # Keep this
-
-# 5. Data Collection
-# Ensure your buffer logic doesn't crash if you don't have 64 samples yet
-# You might want to lower this to 32 if episodes are successful rarely
 target_batch_grounder = 1024
 
-
-# -------------------GEMINI-------------------#
-TT_grounder = 10
-grounder_epochs = 10
-max_episodes = 10000
-
-
-import os
-
-
 def plot_smoothed_sequence_classification_accuracy():
-    # read sequence_classification_accuracy_0.txt
     for i in range(5):
-        # check if file exists
-        if not os.path.exists(
-            os.path.join(
-                os.path.dirname(__file__), f"sequence_classification_accuracy_{i}.txt"
-            )
-        ):
+        file_path = os.path.join(os.path.dirname(__file__), f"sequence_classification_accuracy_{i}.txt")
+        if not os.path.exists(file_path):
             continue
-        with open(
-            os.path.join(
-                os.path.dirname(__file__), f"sequence_classification_accuracy_{i}.txt"
-            ),
-            "r",
-        ) as f:
+        with open(file_path, "r") as f:
             lines = f.readlines()
 
         lines = [line.strip() for line in lines if line.strip()]
         lines = list(map(float, lines))
         smoothed = []
-        mean = 0
-        for i, line in enumerate(lines):
-            if i % 100 == 0:
-                smoothed.append((i, mean / 100))
-                mean = 0
-            mean += line
-            if i == len(lines) - 1:
-                smoothed.append((i, mean / (i % 100 + 1)))  # handle last segment
+        mean_val = 0
+        for idx, line in enumerate(lines):
+            if idx % 100 == 0:
+                smoothed.append((idx, mean_val / 100))
+                mean_val = 0
+            mean_val += line
+            if idx == len(lines) - 1:
+                smoothed.append((idx, mean_val / (idx % 100 + 1))) 
         lines = smoothed
-
-        # plot the smoothed values
-        import matplotlib.pyplot as plt
 
         plt.plot(*zip(*lines))
         plt.xlabel("Training Steps (x100)")
@@ -190,10 +122,6 @@ def plot_smoothed_sequence_classification_accuracy():
         )
         plt.close()
 
-        print(list(lines))
-
-
-# Compute the returns (of the rewards) for one episode
 def compute_returns(next_value, rewards, masks, gamma=0.99):
     R = next_value
     returns = []
@@ -205,22 +133,18 @@ def compute_returns(next_value, rewards, masks, gamma=0.99):
         returns.insert(0, R)
     return returns
 
-
 def pad_list(lst, desired_length):
     if len(lst) < desired_length and lst:
         lst.extend([lst[-1]] * (desired_length - len(lst)))
     return lst
 
-
 def prepare_dataset(sequence_accuracy, image_trajectory, info_trajectory, TT):
     indices = list(np.argsort(sequence_accuracy))
     indices.reverse()
     indices = indices[: int(TT / 2)]
-
     worst_trajectories = [image_trajectory[i] for i in indices]
     worst_related_info = [info_trajectory[i] for i in indices]
     return worst_trajectories, worst_related_info
-
 
 def recurrent_A2C(
     env,
@@ -233,36 +157,14 @@ def recurrent_A2C(
     hidden_size_rnn=50,
     formula_name=""
 ):
-
-    # recurrency =
-    #       - 'rnn'     (rnn+A2C)
-    #       - 'nrm'     (grounding+A2C)
-    #       - 'rm'    (reward machines)
-
-    #################### reinitialize files if they exist or create them
-
-
     task_number = int(formula_name.split(" ")[0][-2])
-    if task_number == 1:
+    if task_number in [1, 3, 5, 6, 7, 8]:
         max_traces = 2
-    elif task_number == 2:
+    elif task_number in [2, 4]:
         max_traces = 3
-    elif task_number == 3:
-        max_traces = 2
-    elif task_number == 4:
-        max_traces = 3
-    elif task_number == 5:
-        max_traces = 2
-    elif task_number == 6:
-        max_traces = 2
-    elif task_number == 7:
-        max_traces = 2
-    elif task_number == 8:
-        max_traces = 2
     else:
-        raise ValueError("Invalid task number in formula name. Update the code to handle this new task.")
+        raise ValueError("Invalid task number in formula name.")
     
-
     f = open(path + "/train_rewards_" + str(experiment) + ".txt", "w")
     f.close()
 
@@ -281,20 +183,12 @@ def recurrent_A2C(
     if num_of_symbols is None:
         num_of_symbols = num_of_symbols_override
 
-    print(
-        f"num_of_states: {num_of_states}, num_of_symbols: {num_of_symbols}, num_automaton_outputs: {num_automaton_outputs}"
-    )
-
-    saved_traces = []
-
-    # number of actions
     num_outputs = env.action_space.n
 
     params = []
-    # --- MODEL INITIALIZATION ---
     if feature_extraction:
         cnn = Net().to(device)
-        cnn.float()  # Model is Float32
+        cnn.float() 
         CNN_output_size = 16
         num_inputs = CNN_output_size
         params += list(cnn.parameters())
@@ -304,29 +198,19 @@ def recurrent_A2C(
     if method == "rnn":
         model = ActorCritic(rnn_hidden_size, num_outputs, hidden_size).to(device)
     else:
-        print(
-            f"PASSING num_inputs: {num_inputs}, num_outputs: {num_outputs}, hidden_size: {hidden_size}"
-        )
-        model = ActorCritic(num_inputs + num_of_states, num_outputs, hidden_size).to(
-            device
-        )
+        model = ActorCritic(num_inputs + num_of_states, num_outputs, hidden_size).to(device)
 
     params += list(model.parameters())
-    model.float()  # Model is Float32
+    model.float() 
 
     if method == "rnn":
         rnn = RNN(num_inputs, rnn_hidden_size, num_layers).to(device)
-        rnn.float()  # Model is Float32
+        rnn.float() 
         params += list(rnn.parameters())
     elif method == "nrm":
-        # ... file creation ...
-        f = open(
-            path + "/sequence_classification_accuracy_" + str(experiment) + ".txt", "w"
-        )
+        f = open(path + "/sequence_classification_accuracy_" + str(experiment) + ".txt", "w")
         f.close()
-        f = open(
-            path + "/image_classification_accuracy_" + str(experiment) + ".txt", "w"
-        )
+        f = open(path + "/image_classification_accuracy_" + str(experiment) + ".txt", "w")
         f.close()
 
         if env.state_type == "symbol":
@@ -343,20 +227,16 @@ def recurrent_A2C(
             dataset=dataset,
         )
 
-        # ### FIX: Initialize Grounder as Float
         grounder.deepAutoma.float()
         grounder.deepAutoma.to(device)
         grounder.classifier.float()
         grounder.classifier.to(device)
 
-        # ... (buffer initialization code remains the same) ...
         image_traj = []
         rew_traj = []
         info_traj = []
         sequence_accuracy = []
         image_accuracy = []
-
-        
 
         positive_buffer = TraceReplayBuffer(capacity=50000)
         nonpos_buffer = TraceReplayBuffer(capacity=50000)
@@ -369,36 +249,31 @@ def recurrent_A2C(
 
     optimizer = optim.Adam(params, lr=lr)
     episode_idx = 0
-    advantage_cat = torch.tensor([]).to(device)
-    log_probs_cat = torch.tensor([]).to(device)
     all_mean_rewards = []
     all_mean_rewards_averaged = []
 
+    # --- PPO Data Buffers ---
+    ppo_states = []
+    ppo_actions = []
+    ppo_log_probs = []
+    ppo_returns = []
+    ppo_advantages = []
 
-
-
-    for episode_idx in tqdm(
-        range(max_episodes), desc="Training episodes", unit="episode"
-    ):
+    for episode_idx in tqdm(range(max_episodes), desc="Training episodes", unit="episode"):
         episode_rewards = []
         done = False
         truncated = False
 
         obs, reward, info = env.reset()
 
-        # --- 1. STATE INITIALIZATION FIX ---
         if method == "rm":
-            # ### FIX: Convert to float() immediately
             state_dfa = torch.tensor(obs[0]).float().to(device)
             state_env = torch.tensor(obs[1]).float().to(device)
 
             if feature_extraction:
                 state_env = cnn(state_env.view(-1, 3, 64, 64))
-
             state = torch.cat((state_env, state_dfa.unsqueeze(0)), 1).squeeze()
         else:
-            # ### FIX: Use .float() instead of .DoubleTensor()
-            # This fixes the mismatch with the CNN (which is float)
             state = torch.tensor(obs).float().to(device)
 
             if method == "rnn":
@@ -407,26 +282,21 @@ def recurrent_A2C(
             elif method == "nrm":
                 state_automa = np.zeros(num_of_states)
                 state_automa[0] = 1.0
-                # ### FIX: Automa state must be float for concatenation
                 state_automa = torch.tensor(state_automa).float().to(device)
 
             raw_state = state
             if feature_extraction:
-                # Now state is float and cnn is float -> NO ERROR
                 state = cnn(state.view(-1, 3, 64, 64))
                 state = state.squeeze()
 
-        # first step with RNN or dfa
         if method == "rnn":
             out, (h_0, c_0) = rnn(state.unsqueeze(0), h_0, c_0)
             state = out
         elif method == "nrm":
-            # Inputs are already float, so this works
             state_grounding = grounder.classifier(raw_state.unsqueeze(0))
             next_state_automa, reward_automa = grounder.deepAutoma.step(
                 state_automa.unsqueeze(0), state_grounding, 1.0
             )
-
             state_automa = torch.zeros(num_of_states).to(device).float()
             state_automa[0] = 1.0
             state = torch.cat((state.unsqueeze(0), state_automa.unsqueeze(0)), dim=-1)
@@ -448,32 +318,45 @@ def recurrent_A2C(
             entropy = 0
 
             for _ in range(num_steps):
-                state = torch.unsqueeze(state, 0)
-                state = state.to(device)
+               
+                # We need the state on the device for the ActorCritic
+                state = torch.unsqueeze(state, 0).to(device)
 
                 dist, value = model(state)
                 action = dist.sample()
+                log_prob = dist.log_prob(action)
 
+                # --- PPO Buffer Appends ---
+                # SAVE RAW INPUTS so we can recompute the CNN/RNN graph later!
+                ppo_actions.append(action.detach())
+                ppo_log_probs.append(log_prob.detach())
+                
+                if method == "rm":
+                    # Save the raw environment image and dfa state
+                    ppo_states.append((raw_state.detach(), state_dfa.detach())) 
+                elif method == "nrm":
+                    # Save raw image and current automa state
+                    ppo_states.append((raw_state.detach(), state_automa.detach()))
+                elif method == "rnn":
+                    # Save raw image and previous hidden states
+                    ppo_states.append((raw_state.detach(), h_0.detach(), c_0.detach()))
+                else:
+                    ppo_states.append(raw_state.detach())
+
+                
                 next_state, reward, done, truncated, info = env.step(action.item())
 
-                # --- 2. NEXT STATE FIX ---
                 if method == "rm":
-                    # ### FIX: Float
                     state_dfa = torch.tensor(next_state[0]).float().to(device)
                     state_env = torch.tensor(next_state[1]).float().to(device)
 
                     if feature_extraction:
                         state_env = cnn(state_env.view(-1, 3, 64, 64))
-                    next_state = torch.cat(
-                        (state_env, state_dfa.unsqueeze(0)), 1
-                    ).squeeze()
+                    next_state = torch.cat((state_env, state_dfa.unsqueeze(0)), 1).squeeze()
                 else:
-                    # ### FIX: Use .float() instead of .DoubleTensor()
                     next_state = torch.tensor(next_state).float().to(device)
-
                     raw_state = next_state
                     if feature_extraction:
-                        # Now next_state is float and cnn is float -> NO ERROR
                         next_state = cnn(next_state.view(-1, 3, 64, 64))
                         next_state = next_state.squeeze()
 
@@ -483,14 +366,9 @@ def recurrent_A2C(
                     elif method == "nrm":
                         with torch.no_grad():
                             if reward != 0:
-                                # Input is already float
-                                state_grounding = grounder.classifier(
-                                    raw_state.unsqueeze(0)
-                                )
-                                next_state_automa, reward_automa = (
-                                    grounder.deepAutoma.step(
-                                        state_automa.unsqueeze(0), state_grounding, 1.0
-                                    )
+                                state_grounding = grounder.classifier(raw_state.unsqueeze(0))
+                                next_state_automa, reward_automa = grounder.deepAutoma.step(
+                                    state_automa.unsqueeze(0), state_grounding, 1.0
                                 )
                                 state_automa = next_state_automa.squeeze(0)
                                 curr_traj.append(raw_state)
@@ -499,68 +377,49 @@ def recurrent_A2C(
                             else:
                                 next_state_automa = state_automa.unsqueeze(0)
 
-                        next_state = torch.cat(
-                            (next_state.unsqueeze(0), state_automa.unsqueeze(0)), dim=-1
-                        )
+                        next_state = torch.cat((next_state.unsqueeze(0), state_automa.unsqueeze(0)), dim=-1)
                         next_state = next_state.squeeze()
 
                 state = next_state
 
-                # ... (rest of the loop remains the same) ...
-                log_prob = dist.log_prob(action)
                 entropy += dist.entropy().mean()
                 log_prob = torch.unsqueeze(log_prob, 0)
                 log_probs.append(log_prob)
                 values.append(value)
+                
                 reward = float(reward)
                 episode_rewards.append(reward)
+                reward_t = torch.tensor(reward).float().unsqueeze(0).unsqueeze(0)
+                rewards.append(reward_t)
 
-                # Rewards processing
-                reward = (
-                    torch.tensor(reward).float().unsqueeze(0).unsqueeze(0)
-                )  # Ensure float
-                rewards.append(reward)
-
-                formask = (
-                    torch.tensor(1 if done else 0).float().unsqueeze(0).unsqueeze(0)
-                )  # Ensure float
+                formask = torch.tensor(1 if done else 0).float().unsqueeze(0).unsqueeze(0)
                 masks.append(formask)
 
                 if done or truncated:
                     break
 
-            # ... (Update logic, Actor Critic Loss) ...
             dist, next_value = model(next_state)
             returns = compute_returns(next_value, rewards, masks)
 
-            log_probs = torch.cat(log_probs)
-            returns = torch.cat(returns)
-            values = torch.cat(values)
-            values = values.reshape((values.size()[0], 1))
+            values_cat = torch.cat(values)
+            values_cat = values_cat.reshape((values_cat.size()[0], 1)).to(device)
+            returns_cat = torch.cat(returns).to(device)
+            
+            advantage = returns_cat - values_cat
 
-            # Ensure everything is on device
-            log_probs = log_probs.to(device)
-            returns = returns.to(device)
-            advantage = returns - values
+            # Append to PPO global buffers for the update phase
+            ppo_returns.extend(returns_cat.detach())
+            ppo_advantages.extend(advantage.detach())
 
-            log_probs_cat = torch.cat((log_probs_cat, log_probs), 0)
-            advantage_cat = torch.cat((advantage_cat, advantage), 0)
-
-            torch.cuda.empty_cache()
-
-        # ... (Episode end logic, grounder training, plotting) ...
-        # (This part of your code is fine, just ensure grounder.train_symbol_grounding is called correctly)
         episode_idx += 1
         all_mean_rewards.append(np.sum(np.array(episode_rewards)))
         all_mean_rewards_averaged.append(mean(all_mean_rewards[-slide_wind:]))
 
         if method == "nrm":
-            # ... accuracy calculation ...
             curr_traj_t = torch.stack(curr_traj).unsqueeze(0)
             curr_info_t = torch.LongTensor(curr_info).unsqueeze(0)
 
-            # Use logic_circuit for speed
-            acc, loss = eval_acceptance(      #tirare fuori la loss da qui
+            acc, loss = eval_acceptance(
                 grounder.classifier,
                 grounder.deepAutoma,
                 num_of_symbols,
@@ -568,67 +427,103 @@ def recurrent_A2C(
                 automa_implementation="logic_circuit",
             )
 
-
-
-            # ... appending to files ...
             sequence_accuracy.append(acc)
-            # ... image accuracy ...
-            image_accuracy.append(0)  # placeholder
+            image_accuracy.append(0)
 
-            # --- INSERT THIS CODE HERE ---
             with open(path + "/sequence_classification_accuracy_" + str(experiment) + ".txt", "a") as f:
                 f.write("{}\n".format(acc))
             
             with open(path + "/image_classification_accuracy_" + str(experiment) + ".txt", "a") as f:
                 f.write("{}\n".format(0))
 
-            # --- FIX STARTS HERE ---
-            
-            # 1. Pad the Trajectory (You already had this)
-            curr_traj = pad_list(curr_traj, max_traces + 1) #it was env.max_num_steps + 1 before, but that is too long and causes memory issues. We only need to pad to the length of the longest trace for this task, which is task_number + 1. For example, if task_number is 3, the longest trace has 4 states (including initial), so we pad to length 4. This prevents excessive padding and memory usage while ensuring all traces are the same length for batching.
-            
-            # 2. CRITICAL: Pad the Info/Labels (You were missing this)
-            # Without this, episodes of different lengths create a ragged list,
-            # causing the "expected sequence of length..." error in torch.LongTensor
+            curr_traj = pad_list(curr_traj, max_traces + 1)
             curr_info = pad_list(curr_info, max_traces + 1)
-            
-            # 3. Optional: Pad rewards if used elsewhere, to maintain consistency
             curr_rew = pad_list(curr_rew, max_traces + 1)
 
-            
-
-            # Add to buffers
             if any(lbl == pos_label for lbl in curr_info):
-                positive_buffer.add(curr_traj, curr_info)       #aggiungere la loss qui
+                positive_buffer.add(curr_traj, curr_info)
             else:
-                nonpos_buffer.add(curr_traj, curr_info)         #aggiungere la loss qui
+                nonpos_buffer.add(curr_traj, curr_info)
 
-        # Policy Update
-        if episode_idx % TT_policy == 0:
-            log_probs_cat = torch.unsqueeze(log_probs_cat, dim=1)
-            actor_loss = -(log_probs_cat * advantage_cat).mean()
-            critic_loss = advantage_cat.pow(2).mean()
-            loss = 0.3 * actor_loss + 0.5 * critic_loss - 0.0001 * entropy
+       # --- PPO POLICY UPDATE ---
+        if episode_idx % TT_policy == 0 and len(ppo_states) > 0:
+            b_actions = torch.cat(ppo_actions).to(device)
+            b_old_log_probs = torch.cat(ppo_log_probs).to(device)
+            b_returns = torch.stack(ppo_returns).to(device)
+            b_advantages = torch.stack(ppo_advantages).to(device)
 
-            optimizer.zero_grad()
-            loss.backward(retain_graph=True)
-            optimizer.step()
+            # Normalize advantages
+            b_advantages = (b_advantages - b_advantages.mean()) / (b_advantages.std() + 1e-8)
 
-            log_probs_cat = torch.tensor([]).to(device)
-            advantage_cat = torch.tensor([]).to(device)
+            for _ in range(ppo_epochs):
+                # 1. REBUILD THE COMPUTATION GRAPH
+                recomputed_states = []
+                
+                for i in range(len(ppo_states)):
+                    if method == "rm":
+                        r_env, r_dfa = ppo_states[i]
+                        if feature_extraction:
+                            r_env = cnn(r_env.view(-1, 3, 64, 64))
+                        s = torch.cat((r_env, r_dfa.unsqueeze(0)), 1).squeeze()
+                        recomputed_states.append(s)
+                        
+                    elif method == "nrm":
+                        r_raw, r_automa = ppo_states[i]
+                        if feature_extraction:
+                            r_raw = cnn(r_raw.view(-1, 3, 64, 64)).squeeze()
+                        s = torch.cat((r_raw.unsqueeze(0), r_automa.unsqueeze(0)), dim=-1).squeeze()
+                        recomputed_states.append(s)
+                        
+                    elif method == "rnn":
+                        r_raw, r_h0, r_c0 = ppo_states[i]
+                        if feature_extraction:
+                            r_raw = cnn(r_raw.view(-1, 3, 64, 64)).squeeze()
+                        out, _ = rnn(r_raw.unsqueeze(0).unsqueeze(0), r_h0, r_c0)
+                        recomputed_states.append(out.squeeze())
+                        
+                    else:
+                        r_raw = ppo_states[i]
+                        if feature_extraction:
+                            r_raw = cnn(r_raw.view(-1, 3, 64, 64)).squeeze()
+                        recomputed_states.append(r_raw)
 
+                # Stack the freshly computed states that now have gradients attached
+                b_states_with_grad = torch.stack(recomputed_states).to(device)
+
+                # 2. Forward pass through ActorCritic
+                dist, new_values = model(b_states_with_grad)
+                new_log_probs = dist.log_prob(b_actions)
+                entropy = dist.entropy().mean()
+
+                new_log_probs = new_log_probs.view(-1, 1)
+                b_old_log_probs_view = b_old_log_probs.view(-1, 1)
+                
+                ratio = torch.exp(new_log_probs - b_old_log_probs_view)
+
+                surr1 = ratio * b_advantages
+                surr2 = torch.clamp(ratio, 1.0 - clip_param, 1.0 + clip_param) * b_advantages
+
+                actor_loss = -torch.min(surr1, surr2).mean()
+                critic_loss = (b_returns - new_values).pow(2).mean()
+
+                loss = actor_loss + 0.5 * critic_loss - 0.001 * entropy
+
+                optimizer.zero_grad()
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(params, max_grad_norm)
+                optimizer.step()
+
+            ppo_states.clear()
+            ppo_actions.clear()
+            ppo_log_probs.clear()
+            ppo_returns.clear()
+            ppo_advantages.clear()
         # Grounder Update
         if method == "nrm":
-            print(
-                f"Episode {episode_idx}, TT_policy {TT_policy}, TT_grounder {TT_grounder}, sequence accuracy (last) {sequence_accuracy[-1]}"
-            )
             if episode_idx % TT_grounder == 0:
-                # ... Sampling logic ...
                 target_sample_size = target_batch_grounder
                 total_data = len(positive_buffer) + len(nonpos_buffer)
-                print(f"LOG: total_data {total_data}")
                 if total_data >= target_sample_size:
-                    # Balanced Sampling
                     n_pos = target_sample_size // 2
                     n_neg = target_sample_size - n_pos
 
@@ -640,14 +535,12 @@ def recurrent_A2C(
 
                     zero_samples = nonpos_buffer.sample(n_neg)
                     sampled = pos_samples + zero_samples
-                    print(f"LOG: len(sampled) {len(sampled)}")
 
                     if len(sampled) >= 64:
                         bat_traj = [traj for (traj, labels) in sampled]
                         bat_labels = [labels for (traj, labels) in sampled]
 
                         grounder.set_dataset(bat_traj, bat_labels)
-                        # TRAIN
                         grounder.train_symbol_grounding(
                             grounder_epochs, batch_size=64, env=env
                         )
@@ -655,11 +548,8 @@ def recurrent_A2C(
                 image_traj = []
                 rew_traj = []
                 info_traj = []
-                sum_rew_traj = []
-                #grounder.eval_symbol_grounding(env=env)
 
         if episode_idx % TTT == 0 and len(all_mean_rewards) >= 100:
-            ## plot rewards
             plt.plot(
                 [i for i in range(len(all_mean_rewards))], all_mean_rewards_averaged
             )
@@ -670,7 +560,6 @@ def recurrent_A2C(
             plt.clf()
             plt.close()
 
-            # plot the accuracies for nrm
             if method == "nrm":
                 plt.plot([i for i in range(len(sequence_accuracy))], sequence_accuracy)
                 plt.xlabel("episode")
@@ -692,11 +581,11 @@ def recurrent_A2C(
 
             plot_smoothed_sequence_classification_accuracy()
 
-        # else:
         ep_reward = all_mean_rewards[-1]
         f = open(path + "/train_rewards_" + str(experiment) + ".txt", "a")
         f.write(str(ep_reward) + "\n")
         f.close()
+        
         if episode_idx % 100 == 0:
             print(
                 "Mean cumulative reward in the last {} episodes: {}".format(
@@ -707,10 +596,6 @@ def recurrent_A2C(
         if len(all_mean_rewards) >= 100 and all_mean_rewards_averaged[-1] == 100:
             episode_idx = max_episodes
 
-        
-
-
-        # exit()
     if method == "nrm":
         with open(path + "/DeepAutoma_Before_Minimization_exp" + str(experiment) + ".pkl", 'wb') as outp:
             pickle.dump(grounder.deepAutoma, outp, pickle.HIGHEST_PROTOCOL)
@@ -724,13 +609,7 @@ def recurrent_A2C(
             with open(path + "/DeepAutoma_Symbol_Grounding_Classifier_exp" + str(experiment) + ".pkl", 'wb') as outp:
                 pickle.dump(grounder.classifier, outp, pickle.HIGHEST_PROTOCOL)
                 
-
-
-      # save the cnn state dict in case of feature extraction
     if feature_extraction:
         torch.save(
             cnn.state_dict(), path + "/cnn_state_dict_" + str(experiment) + ".pt"
         )
-
-        # save for future use in a pickle and in case in exists, append it
-    

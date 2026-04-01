@@ -11,3 +11,4 @@ Results
 *.dot
 *.pyc
 __pycache__/
+*.pt
